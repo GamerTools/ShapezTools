@@ -6,12 +6,16 @@ import java.util.regex.Pattern;
 /**
  * Shape
  * 
- * Shape codes - A shape has 4 quadrants and 1 to 4 layers. - A shape code string is the same syntax the game uses. -
- * Shape code syntax: A.B.C.D.:<...>, where ABCD are quads 1234 - A shape is represented internally by 32 bit integer,
- * two bits for each possible position. - The order of the bits is simply the reverse order of the game's shape string
- * (constant value). - Shape integer value in binary syntax: <...>:DCBA:dcba - two bits (Xx): 00 - gap(-), 01 -
- * solid(O), 10 - pin(I), 11 - crystal(X) - Examples: bowtie (Ru--Ru--) is 05, (P---P---) is 50, (cu--cu--) is 55 -
- * Shape piece types (C, R, S, W) and colors are currently not used.
+ * Shape codes
+ * - A shape has 4 quadrants and 1 to 4 layers.
+ * - A shape code string is the same syntax the game uses.
+ * - Shape code syntax: A.B.C.D.:<...>, where ABCD are quads 1234
+ * - A shape is represented internally by 32 bit integer, two bits for each possible position.
+ * - The order of the bits is simply the reverse order of the game's shape string (constant value).
+ * - Shape integer value in binary: <...>DCBAdcba
+ * - two bits (Xx): 00 - gap(-), 01 - solid(O), 10 - pin(I), 11 - crystal(X)
+ * - Examples: bowtie (Ru--Ru--) is 05, (P---P---) is 50, (cu--cu--) is 55
+ * - Shape piece types (C, R, S, W) and colors are currently not used.
  */
 public class Shape {
 
