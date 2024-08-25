@@ -1,0 +1,2924 @@
+Implemented shape ops in Java
+
+Running random shapes to test performance
+
+Found this...
+cutRight(dafd8739) => 00100001
+Is this correct? Yes it is!
+
+pinPush(83d063f0) => 00000002
+code: --------:cgRgcgcg:cbcb----:--RwRwP-, value: 83d063f0
+It has an gap layer, so this is an invalid shape.
+But if it was pin pushed...
+- the 4th layer would disapear
+- all the cystals would break as they fall because of the gap layer
+- no pins would be added because the gap is on the bottom layer
+The only part left would be --Rg----, which is 0002
+
+Performance testing
+
+ROUNDS = 20, ITERS = 10M
+1279 pinPush(e3099407) => 039f0470
+average time: 1289.75, 7.75 MOPS
+
+Running a Stream in parallel is super easy...
+    int[] results = IntStream.of(values).parallel().map(func).toArray();
+I get over 5x improvement (for 16 virtual cores).
+
+ROUNDS = 20, ITERS = 100M
+2332 pinPush(5f23b97c) => 623f07c0
+average time: 2353.90, 42.48 MOPS
+
+Implemented Constructor
+
+Tested with MAX_LAYERS = 1
+input shapes: FLAT_4 and PIN_4
+Returned 255 possible as expected
+
+Increased to 2 layers max.
+
+Failed with an StackOverflowError exception...
+
+ITER #4
+ONE_OPS 7 4576 > 32032
+TWO_OPS 3 4938 4576 > 135577728
+Exception in thread "main" java.lang.StackOverflowError
+        at java.base/java.util.stream.Streams$ConcatSpliterator.estimateSize(Streams.java:743)
+        at java.base/java.util.stream.Streams$ConcatSpliterator.estimateSize(Streams.java:743)
+
+Looks like it's stuck in a recursive loop?
+Actually the API docs warn about this in IntStream.concat()...
+  Use caution when constructing streams from repeated concatenation.
+  Accessing an element of a deeply concatenated stream can result in deep
+  call chains, or even {@code StackOverflowError}.
+
+Replaced the concat() calls with mapMulti().
+Ran it for 2 layers, and got the same number of shapes as my JavaScript version!
+
+...1-layer...
+
+SPU 1.0
+Wed Jun 12 00:33:08 PDT 2024
+
+Max iters: 10
+Max layers: 1
+Input shapes
+code: RrRrRrRr:--------:--------:--------, value: 0000000f
+code: P-P-P-P-:--------:--------:--------, value: 000f0000
+
+ITER #1
+ONE_OPS 7 2 > 14
+TWO_OPS 3 2 2 > 24
+NEW 7
+
+ITER #2
+ONE_OPS 7 7 > 49
+TWO_OPS 3 7 9 > 378
+NEW 8
+
+ITER #3
+ONE_OPS 7 8 > 56
+TWO_OPS 3 8 17 > 816
+NEW 84
+
+ITER #4
+ONE_OPS 7 84 > 588
+TWO_OPS 3 84 101 > 50904
+NEW 26
+
+ITER #5
+ONE_OPS 7 26 > 182
+TWO_OPS 3 26 127 > 19812
+NEW 32
+
+ITER #6
+ONE_OPS 7 32 > 224
+TWO_OPS 3 32 159 > 30528
+NEW 24
+
+ITER #7
+ONE_OPS 7 24 > 168
+TWO_OPS 3 24 183 > 26352
+NEW 72
+
+ITER #8
+ONE_OPS 7 72 > 504
+TWO_OPS 3 72 255 > 110160
+DONE
+
+Number: 255
+Time: 136
+
+...2-layers...
+
+SPU 1.0
+Wed Jun 12 00:39:30 PDT 2024
+
+Max iters: 20
+Max layers: 2
+Input shapes
+code: RrRrRrRr:--------:--------:--------, value: 0000000f
+code: P-P-P-P-:--------:--------:--------, value: 000f0000
+
+ITER #1
+ONE_OPS 7 2 > 14
+TWO_OPS 3 2 2 > 24
+NEW 11
+
+ITER #2
+ONE_OPS 7 11 > 77
+TWO_OPS 3 11 13 > 858
+NEW 59
+
+ITER #3
+ONE_OPS 7 59 > 413
+TWO_OPS 3 59 72 > 25488
+NEW 290
+
+ITER #4
+ONE_OPS 7 290 > 2030
+TWO_OPS 3 290 362 > 629880
+NEW 4576
+
+ITER #5
+ONE_OPS 7 4576 > 32032
+TWO_OPS 3 4576 4938 > 135577728
+NEW 2652
+
+ITER #6
+ONE_OPS 7 2652 > 18564
+TWO_OPS 3 2652 7590 > 120772080
+NEW 4052
+
+ITER #7
+ONE_OPS 7 4052 > 28364
+TWO_OPS 3 4052 11642 > 283040304
+NEW 4066
+
+ITER #8
+ONE_OPS 7 4066 > 28462
+TWO_OPS 3 4066 15708 > 383212368
+NEW 18424
+
+ITER #9
+ONE_OPS 7 18424 > 128968
+TWO_OPS 3 18424 34132 > 3773087808
+NEW 1148
+
+ITER #10
+ONE_OPS 7 1148 > 8036
+TWO_OPS 3 1148 35280 > 243008640
+DONE
+
+Number: 35280
+Time: 131512
+
+Reduced the list of Ops used, and the time went from 130 to 85 seconds.
+  private static final IntUnaryOperator[] ONE_OPS = { Ops::rotateRight, Ops::cutRight, Ops::pinPush, Ops::crystal };
+  private static final IntBinaryOperator[] TWO_OPS = { Ops::swapRight, Ops::stack };
+
+Number: 35280
+Time: 84936
+
+swapRight is two cuts...
+  static int swapRight(int left, int right) {
+    int leftHalf = cutLeft(left);
+    int rightHalf = cutRight(right);
+    return leftHalf | rightHalf;
+  }
+
+Implemented fastSwapRight()...
+
+Number: 35280
+Time: 47195
+
+Time is now 47.
+
+Implemented fastStack() where only the bottom layer of the top shape is passed.
+
+Number: 35280
+Time: 22049
+
+Modified fastStack() to return when the top is not 1-layer.
+
+Number: 35280
+Time: 4305
+
+Ran 3 layers, but it quit too soon...
+
+SPU 1.0
+Wed Jun 12 02:55:06 PDT 2024
+
+Max iters: 20
+Max layers: 3
+Input shapes
+code: RrRrRrRr:--------:--------:--------, value: 0000000f
+code: P-P-P-P-:--------:--------:--------, value: 000f0000
+
+ITER #1
+ONE_OPS 4 2 > 8
+TWO_OPS 2 2 2 > 16
+NEW 7
+
+ITER #2
+ONE_OPS 4 7 > 28
+TWO_OPS 2 7 9 > 252
+NEW 37
+
+ITER #3
+ONE_OPS 4 37 > 148
+TWO_OPS 2 37 46 > 6808
+NEW 157
+
+ITER #4
+ONE_OPS 4 157 > 628
+TWO_OPS 2 157 203 > 127484
+NEW 534
+
+ITER #5
+ONE_OPS 4 534 > 2136
+TWO_OPS 2 534 737 > 1574232
+NEW 2950
+
+ITER #6
+ONE_OPS 4 2950 > 11800
+TWO_OPS 2 2950 3687 > 43506600
+NEW 19474
+
+ITER #7
+ONE_OPS 4 19474 > 77896
+TWO_OPS 2 19474 23161 > 1804149256
+NEW 79589
+
+ITER #8
+ONE_OPS 4 79589 > 318356
+TWO_OPS 2 79589 102750 > 32711079000
+NEW 110981
+
+ITER #9
+ONE_OPS 4 110981 > 443924
+TWO_OPS 2 110981 213731 > 94880320444
+NEW 103146
+
+ITER #10
+ONE_OPS 4 103146 > 412584
+TWO_OPS 2 103146 316877 > 130738380168
+NEW 151515
+
+ITER #11
+ONE_OPS 4 151515 > 606060
+TWO_OPS 2 151515 468392 > 283873655520
+NEW 262661
+
+ITER #12
+ONE_OPS 4 262661 > 1050644
+TWO_OPS 2 262661 731053 > 768076448132
+NEW 471533
+
+ITER #13
+ONE_OPS 4 471533 > 1886132
+TWO_OPS 2 471533 1202586 > 2268235937352
+NEW 601791
+
+ITER #14
+ONE_OPS 4 601791 > 2407164
+TWO_OPS 2 601791 1804377 > 4343431356828
+NEW 889972
+
+ITER #15
+ONE_OPS 4 889972 > 3559888
+TWO_OPS 2 889972 2694349 > 9591580672912
+NEW 754357
+
+ITER #16
+ONE_OPS 4 754357 > 3017428
+TWO_OPS 2 754357 3448706 > 10406222048168
+NEW 147239
+
+ITER #17
+ONE_OPS 4 147239 > 588956
+TWO_OPS 2 147239 3595945 > 2117853383420
+NEW 134196
+
+ITER #18
+ONE_OPS 4 134196 > 536784
+TWO_OPS 2 134196 3730141 > 2002280006544
+NEW 90037
+
+ITER #19
+ONE_OPS 4 90037 > 360148
+TWO_OPS 2 90037 3820178 > 1375829466344
+NEW 32701
+
+ITER #20
+ONE_OPS 4 32701 > 130804
+TWO_OPS 2 32701 3852879 > 503971984716
+NEW 12708
+
+Number: 3865587
+Time: 64307170
+
+The time is wrong, since the computer was off for about 6 hours.
+
+Added stats
+
+Test 2 layers, normal stack
+cut: 35280, stack: 1388859920, rotate: 35280, pinPush 35280, crystal 35280, collapse: 53572
+
+Test 2 layers, fastStack with crystals
+cut: 35280, stack: 9642287, rotate: 35280, pinPush 35280, crystal 35280, collapse: 55930
+
+Test 2 layers, fastStack without crystals
+cut: 35280, stack: 2906894, rotate: 35280, pinPush 35280, crystal 35280, collapse: 54967
+
+stack was called 1,388,859,920 times
+35280^2 = 1,244,678,400
+
+I would expect stack to be called 2 times the square.  Do streams dedup/memoize function calls?
+Different runs call stack a differnt number of times.
+Maybe (hopefully) this is due to finding different solutions to some shapes.  Like swap or stack could make the same shape.
+
+Also, collapse is called with every cut and pinPush, so it should be just the sum of those.
+
+Changed makeShapes to use streams and flatMap, instead of a for loop and mapMulti.
+Pretty sure this avoids duplicate calls to stack and swap.
+Also changed the run loop to add input shapes to allShapes after calling makeShapes instead of before.
+Also removed all calls to parallel except at the very end of the chain before toArray().
+It is slower now, but not sure if that's because of the metrics.
+
+Need to try both methods.
+
+Using allShapeStream().mapMulti(for(s1:input)) is faster than other way around.
+Also faster than using flatMap of streams.  At least for small number of input shapes (~5000).
+
+TODO
+- Try implementing both methods: store new shapes before calling makeShapes, and after calling makeShapes.
+- Write results to a file.
+- Implement shape analysis.  E.g. Find all shapes that match a pattern, such as pin or gap under crystal.
+- Remember the op and input shapes for each new shape, at least until that data is written to a file.
+- Investigate parallel() some more.  It seems to only be using some of the cores, around 50% total CPU usage.
+- More performance improvements, if possible.
+- Find all 4-layer shapes.
+- Implement cost function and find minimum soliutions.  Would need to store all solutions in memory I think.  Might need a file backed cache.
+- Modify solution viewer to work with S2 ops.  Host it on github?
+
+More optimization
+
+Changed run method to store new shapes before calling makeShapes.
+This allowed shapes to be filtered out before calling the op, rather than afterwards.
+Under 2 seconds now.
+
+Number: 35280
+Time: 1915
+cut: 35280, swap: 32357, stack: 2809592, rotate: 35280, pinPush 35280, crystal 35280, collapse: 56579
+
+Further optimization might be possible:
+- Optimize stack op.  DONE (2x faster)
+- Optimize dropPin and dropPart.
+- Use pre-filters instead of fastSwap and fastStack.  DONE (8x faster)
+- Keep track of which shapes were used rather than build a set of new shapes every iter.
+- Or maybe store an object with a used flag and a build op.
+
+I think there might be a bug in dropPart and dropPin when dropping from a layer that is occupied.
+For example, stack a pin on a 4-layer solid shape.
+This works, but only because Shape.PIN_MASK << (4 * offset + quad) is zero when offset is 4.
+
+3-layers...
+
+SPU 1.0
+Fri Jun 14 01:36:51 PDT 2024
+
+Max iters: 100
+Max layers: 3
+Input shapes
+code: RrRrRrRr:--------:--------:--------, value: 0000000f
+code: P-P-P-P-:--------:--------:--------, value: 000f0000
+
+ITER #1
+ONE_OPS 4 2 > 8
+TWO_OPS 2 2 2 > 8
+NEW 7
+
+ITER #2
+ONE_OPS 4 7 > 28
+TWO_OPS 2 7 9 > 154
+NEW 37
+
+ITER #3
+ONE_OPS 4 37 > 148
+TWO_OPS 2 37 46 > 4070
+NEW 157
+
+ITER #4
+ONE_OPS 4 157 > 628
+TWO_OPS 2 157 203 > 78186
+NEW 534
+
+ITER #5
+ONE_OPS 4 534 > 2136
+TWO_OPS 2 534 737 > 1003920
+NEW 2950
+
+ITER #6
+ONE_OPS 4 2950 > 11800
+TWO_OPS 2 2950 3687 > 26101600
+NEW 19474
+
+ITER #7
+ONE_OPS 4 19474 > 77896
+TWO_OPS 2 19474 23161 > 1045675904
+NEW 79589
+
+ITER #8
+ONE_OPS 4 79589 > 318356
+TWO_OPS 2 79589 102750 > 20042261158
+NEW 110981
+
+ITER #9
+ONE_OPS 4 110981 > 443924
+TWO_OPS 2 110981 213731 > 70246755722
+NEW 103146
+
+ITER #10
+ONE_OPS 4 103146 > 412584
+TWO_OPS 2 103146 316877 > 109460185536
+NEW 151515
+
+ITER #11
+ONE_OPS 4 151515 > 606060
+TWO_OPS 2 151515 468392 > 237960065070
+NEW 262661
+
+ITER #12
+ONE_OPS 4 262661 > 1050644
+TWO_OPS 2 262661 731053 > 630094846290
+NEW 471533
+
+ITER #13
+ONE_OPS 4 471533 > 1886132
+TWO_OPS 2 471533 1202586 > 1823549197174
+NEW 601791
+
+ITER #14
+ONE_OPS 4 601791 > 2407164
+TWO_OPS 2 601791 1804377 > 3619126541466
+NEW 889972
+
+ITER #15
+ONE_OPS 4 889972 > 3559888
+TWO_OPS 2 889972 2694349 > 8007480351344
+NEW 754357
+
+ITER #16
+ONE_OPS 4 754357 > 3017428
+TWO_OPS 2 754357 3448706 > 9268113081270
+NEW 147239
+
+ITER #17
+ONE_OPS 4 147239 > 588956
+TWO_OPS 2 147239 3595945 > 2074494737178
+NEW 134196
+
+ITER #18
+ONE_OPS 4 134196 > 536784
+TWO_OPS 2 134196 3730141 > 1966262873712
+NEW 90037
+
+ITER #19
+ONE_OPS 4 90037 > 360148
+TWO_OPS 2 90037 3820178 > 1359616143606
+NEW 32701
+
+ITER #20
+ONE_OPS 4 32701 > 130804
+TWO_OPS 2 32701 3852879 > 501833273914
+NEW 12708
+
+ITER #21
+ONE_OPS 4 12708 > 50832
+TWO_OPS 2 12708 3865587 > 196172531856
+DONE
+
+Number: 3865587
+Time: 77989196
+cut: 3865587, swap: 3222003, stack: 309229442, rotate: 3865587, pinPush 3865587, crystal 3865587, collapse: 5970101
+
+77989196msec is 21.66 hours
+minus about 6 is about 16 hours, which is 57,600,000 msec
+
+            number   time(sec)
+1-layer        255       0.055
+2-layer     35,280       2.030
+3-layer  3,865,587  57,600.000
+
+Optimized stack().  Was 35 MOPS, now 65 MOPS.
+
+Investigate why swap is different each run...
+
+Lefts: 180, Rights: 180
+Number: 35280
+Time: 2077
+cut: 35280, swap: 32347, stack: 2806959, rotate: 35280, pinPush 35280, crystal 35280, collapse: 57621
+
+I would expect swap to be all the left/right combos.
+That is number of half shapes squared.  180^2 = 32,400.
+But swap changes each run.
+
+When run with sequential (not parallel) streams...
+cut: 35280, swap: 32400, stack: 2822400, rotate: 35280, pinPush 35280, crystal 35280, collapse: 70560
+
+swap 180^2
+stack 1680^2
+
+Lefts: 180, Rights: 180
+oneLayerNoCrystal: 80 (3^4 - 1)
+
+swap = 32400 = 180^2 (correct)
+stack = 2822400 = 35280 * 80 (correct)
+collapse = 70560 (cut + pinPush)
+
+All of these are less when running with parallel stream.  Don't know why.
+I though maybe it was finding different solutions, but maybe parallel stream are not working as expected.
+The collapse numbers are strange. It has nothing to do with swap or stack, so should be unaffected by the fast versions.
+
+without parallel...
+cut: 35280, swap: 32400, stack: 2822400, rotate: 35280, pinPush 35280, crystal 35280, collapse: 70560
+
+with parallel...
+cut: 35280, swap: 32373, stack: 2803965, rotate: 35280, pinPush 35280, crystal 35280, collapse: 59847
+cut: 35280, swap: 32361, stack: 2804396, rotate: 35280, pinPush 35280, crystal 35280, collapse: 57882
+cut: 35280, swap: 32357, stack: 2805509, rotate: 35280, pinPush 35280, crystal 35280, collapse: 56245
+
+Maybe the stats are not thread safe?
+Yep, that was it.
+Fixed it with AtomicInt.
+
+with parallel...
+cut: 35280, swap: 32400, stack: 2822400, rotate: 35280, pinPush 35280, crystal 35280, collapse: 70560
+
+Try stack with any non-crystal shape (remove 1-layer check)...
+
+lefts: 180, rights: 180
+noCrystal: 3224
+oneLayerNoCrystal: 80
+Number: 35280
+Time: 3898
+cut: 35280, swap: 32400, stack: 113742720, rotate: 35280, pinPush 35280, crystal 35280, collapse: 70560
+
+There are 3224 (istead of 80) top layer shapes.
+So stack should be 3224 * 35280 = 113,742,720.  Correct.
+
+But, that's significantly more shapes and stack operations to perform.
+
+I think I want to find all possible shapes first, and find solutions later.
+
+1-layer shapes
+ 80 without crystals
+175 with crystals
+
+1 and 2-layer shapes
+ 3,224 without crystals: 
+32,056 with crystals
+
+         without    with
+1-layer       80     175
+2-layer    3,144  31,881
+total      3,224  32,056
+
+1-layer...
+lefts: 15, rights: 15
+noCrystal: 80
+cut: 255, swap: 225, stack: 20400, rotate: 255, pinPush 255, crystal 255, collapse: 510
+
+This seems to indicate there are 30 shapes that require a stacker.  I thought all 1-layer could use a swapper.
+Need to find some examples.
+
+For 1-layer, it's the shapes that swapper can't make, like half empty.  Need to use a cutter?
+
+The 30 is the lefts and the rights.
+
+Can you make a half shape with the swapper?
+I think so, as long as both inputs have something.
+But better to use a "smart swapper" that uses a cutter (one input) if needed.
+
+Verified that fastSwap (with only left and right halves) makes the same list as swapping all shapes.
+Needed to add left and right halves to the output list.
+There are 180 left/right halves, so that's (180 * 180) + (2 * 180) = 180 * (180 + 2) = 32,760 shapes.
+
+Note: swap can output the zero shape, so might need to filter that out.
+
+Which shapes can't be made by swapper?
+35,280 - 32,760 = 2520
+
+Check all rotations of swap output, using key shapes to filter.
+3168 shapes that can't be made by swapper.
+
+Why is it different?
+
+This appears in both the swap list and the not swap list...
+value: 00000076, code: --RrRr--:RgRgRg--:--------:--------
+
+That can be made by the swapper.
+There are swap shapes that are not key values.
+Fixed it by first finding the keyValues of all the swap shapes and then using that to filter all shapes.
+
+Writing file: result.txt
+Number of values written: 264
+
+Key shapes...
+Writing file: result.txt
+Number of values written: 45
+
+Reading file: allShapes2.txt
+Number of values read: 35280
+1-layer 255 54
+2-layer 35280 5091
+
+2-layer possible: 35280
+2-layer impossible: 30256
+total: 35536 (2^16) correct
+
+TODO
+- Find impossible shapes, filter out invalid shapes (gap layers)
+- Find possible crystals over pins, crystals over gaps
+
+Writing file: impShapes.txt
+Number of values written: 30000
+
+Exactly 30,000 impossible 2-layer shapes
+Looks like most of them are either floating layers, or pins over gaps.
+Should filter those out and key map it.
+
+Filter out more floating parts...
+- pins over gaps
+- pin is same as gap on top layer (can't support adjacent solids)
+
+crystal over pins
+possible    9571  1336
+impossible  5340   720
+
+Looking at impossible shapes.
+4225 key impossible shapes
+
+- Fitler pins over gaps
+- Filter out all floating (as if pins are gaps)
+
+1203 key shapes found.  Examples...
+value: 00100032, code: --Rr----:cgRg----:--------:--------
+value: 00110070, code: P-------:cgRgRg--:--------:--------
+value: 001100b0, code: P-------:cgRg--Rg:--------:--------
+
+The first one has a crystal over a gap.  I know it is possible to have a gap directly under a crystal, but I think it's impossible to have a gap all the way down to the base. 
+The next two have a crystal supporting two solid quarters.  These are impossible because it is impossible to swap a floating part. 
+I think the check is to imagine cutting the part (and the 90 degree rotation of the part).  If something collapses in both cases, then it is impossible.
+
+Run 3-layers...
+
+Time: 14416
+cut: 3865587, swap: 3222025, stack: 309246960, rotate: 3865587, pinPush 3865587, crystal 3865587, collapse: 7731174
+
+OMG - 14.4 seconds.  Was 16+ hours.
+
+Run 4-layers...
+
+ITER #15
+ONE_OPS 4 50822726 > 203290904
+TWO_OPS 2 50822726 119938943 > 19216597191132320
+NEW 85432162
+
+ITER #16
+ONE_OPS 4 85432162 > 341728648
+TWO_OPS 2 85432162 205371105 > 55583881441927552
+Exception in thread "main" java.lang.OutOfMemoryError
+        at java.base/jdk.internal.reflect.NativeConstructorAccessorImpl.newInstance0(Native Method)
+        at java.base/jdk.internal.reflect.NativeConstructorAccessorImpl.newInstance(NativeConstructorAccessorImpl.java:77)
+        at java.base/jdk.internal.reflect.DelegatingConstructorAccessorImpl.newInstance(DelegatingConstructorAccessorImpl.java:45)
+        at java.base/java.lang.reflect.Constructor.newInstanceWithCaller(Constructor.java:499)
+        at java.base/java.lang.reflect.Constructor.newInstance(Constructor.java:480)
+        at java.base/java.util.concurrent.ForkJoinTask.getThrowableException(ForkJoinTask.java:564)
+        at java.base/java.util.concurrent.ForkJoinTask.reportException(ForkJoinTask.java:591)
+        at java.base/java.util.concurrent.ForkJoinTask.invoke(ForkJoinTask.java:689)
+        at java.base/java.util.stream.ReduceOps$ReduceOp.evaluateParallel(ReduceOps.java:927)
+        at java.base/java.util.stream.DistinctOps$1.reduce(DistinctOps.java:64)
+        at java.base/java.util.stream.DistinctOps$1.opEvaluateParallelLazy(DistinctOps.java:110)
+        at java.base/java.util.stream.AbstractPipeline.sourceSpliterator(AbstractPipeline.java:434)
+        at java.base/java.util.stream.AbstractPipeline.evaluateToArrayNode(AbstractPipeline.java:260)
+        at java.base/java.util.stream.IntPipeline.toArray(IntPipeline.java:562)
+        at Constructor.makeShapes2(Constructor.java:151)
+        at Constructor.run2(Constructor.java:168)
+        at Main.makeShapes(Main.java:26)
+        at Main.main(Main.java:19)
+Caused by: java.lang.OutOfMemoryError: Java heap space
+        at java.base/java.util.HashMap.resize(HashMap.java:702)
+        at java.base/java.util.HashMap.putVal(HashMap.java:661)
+        at java.base/java.util.HashMap.put(HashMap.java:610)
+        at java.base/java.util.HashSet.add(HashSet.java:221)
+        at java.base/java.util.stream.DistinctOps$1$$Lambda$48/0x00000222f104d8c8.accept(Unknown Source)
+        at java.base/java.util.stream.ReduceOps$4ReducingSink.accept(ReduceOps.java:220)
+        at java.base/java.util.stream.IntPipeline$1$1.accept(IntPipeline.java:180)
+        at java.base/java.util.stream.IntPipeline$10$1.accept(IntPipeline.java:393)
+        at java.base/java.util.stream.ReferencePipeline$8$1$$Lambda$50/0x00000222f104f2f0.accept(Unknown Source)
+        at java.base/java.util.stream.ForEachOps$ForEachOp$OfInt.accept(ForEachOps.java:204)
+        at Constructor.lambda$32(Constructor.java:142)
+        at Constructor$$Lambda$42/0x00000222f1006550.accept(Unknown Source)
+        at java.base/java.util.stream.IntPipeline$8$1.accept(IntPipeline.java:358)
+        at java.base/java.util.stream.IntPipeline$10$1.accept(IntPipeline.java:393)
+        at java.base/java.util.stream.ReferencePipeline$4$1.accept(ReferencePipeline.java:214)
+        at java.base/java.util.HashMap$KeySpliterator.forEachRemaining(HashMap.java:1707)
+        at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+        at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+        at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:150)
+        at java.base/java.util.stream.ForEachOps$ForEachOp$OfInt.evaluateSequential(ForEachOps.java:188)
+        at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+        at java.base/java.util.stream.IntPipeline.forEach(IntPipeline.java:463)
+        at java.base/java.util.stream.ReferencePipeline$8$1.accept(ReferencePipeline.java:324)
+        at java.base/java.util.ArrayList$ArrayListSpliterator.forEachRemaining(ArrayList.java:1625)
+        at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+        at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+        at java.base/java.util.stream.ReduceOps$ReduceTask.doLeaf(ReduceOps.java:960)
+        at java.base/java.util.stream.ReduceOps$ReduceTask.doLeaf(ReduceOps.java:934)
+        at java.base/java.util.stream.AbstractTask.compute(AbstractTask.java:327)
+        at java.base/java.util.concurrent.CountedCompleter.exec(CountedCompleter.java:754)
+        at java.base/java.util.concurrent.ForkJoinTask.doExec(ForkJoinTask.java:373)
+        at java.base/java.util.concurrent.ForkJoinPool$WorkQueue.topLevelExec(ForkJoinPool.java:1182)
+
+Analyze 3-layer shapes...
+
+1-layer        255         54
+2-layer      35025       5037
+3-layer    3830307     497779
+
+Same number of 2-layer shapes, so no new 2-layers found.
+
+Possible shapes with gap under crystal similar to the one I made...
+value: 02110302, code: P-Rr----:P-------:Rbcb----:--------
+value: 03110302, code: P-Rr----:P-------:cbcb----:--------
+
+First one found...
+value: 01000323, code: RrRr----:--Rg----:cbRb----:--------
+
+Vortex equivalent shapes (no gaps)...
+Number of values written: 176275
+
+TODO
+- space optimization
+- collect to a Set, instead of passing int[] - slower and larger
+- reuse data structures and variable as much as possible - not possible when used inside a stream
+
+With flat and pins...
+ITER #20
+ONE_OPS 4 32701 > 130804
+TWO_OPS 2 32701 3852879 > 501833273914
+NEW 12708
+
+ITER #21
+ONE_OPS 4 12708 > 50832
+TWO_OPS 2 12708 3865587 > 196172531856
+DONE
+
+Time: 14038
+cut: 3865587, swap: 3222025, stack: 309246960, rotate: 3865587, pinPush 3865587, crystal 3865587, collapse: 7731174
+
+With just flats...
+ITER #20
+ONE_OPS 4 32701 > 130804
+TWO_OPS 2 32701 3852879 > 501833273914
+NEW 12708
+
+ITER #21
+ONE_OPS 4 12708 > 50832
+TWO_OPS 2 12708 3865587 > 196172531856
+DONE
+
+Time: 15399
+cut: 3865587, swap: 3222025, stack: 309246960, rotate: 3865587, pinPush 3865587, crystal 3865587, collapse: 7731174
+
+Yes, you can make all 3-layer shapes with just flats (and no 4th layer)
+It's probably using crystals to make pins.
+
+TODO
+- Append to results file with each iteration
+- run as much of 4-layer as possible
+- find solutions
+- create solutions database
+- update solution viewer
+
+Maybe the Constructor can work in batches.
+Like...
+- read 1M (new) shapes from a file.
+- perform all ops.
+- append to the file.
+- repeat where it left off.
+- need to store all shapes in memory to check for duplicates, but only need one copy.
+- old shapes would be all the known shapes?  every shape up to but not including the new shapes?
+
+Attempt 1:
+- Assume there are 100 old shapes, and batches are 10 shapes each (new shapes).
+- The old shapes are the currently known shapes, but not a complete list of all possible shapes.
+- So read 10, and perform...
+  - One ops on each (newshape)  (10 ops)
+  - Two ops on each (newshape, newshape)  (100 ops)
+  - Two ops on each (oldshape, newshape)  (1000 ops)
+  - Two ops on each (newshape, oldshape)  (1000 ops)
+- If oldshapes contains newshapes, then there are duplicate ops calls.
+- So, newshapes and oldshapes should be disjoint / separate groups.
+
+Attempt 2:
+- Read all known shapes into memory (because we need to check any result/output shapes for duplicate)
+- The file could be read in rounds / chunks / batches of shapes to fit all possible op results in memory.
+- Round 1: (n shapes)
+- Treat the entire file (up to some limit) as the list of input shapes
+- Need to perform all one ops on each, and all two ops on all pairs.
+  - one ops on each (n)    // n
+  - two ops on each (n, n) // n^2
+- that's n^2 + n or n(n+1) ops.
+- All new shapes are appended to the file, but not used in this round.
+- This would find any new shapes for the first n shapes in the file.
+- Rounds would be repeated until there were no new shapes found.
+- Round 2: (m shapes)
+- Treats the rest of the file (up to some limit) as the list of input shapes.
+- Does not need to do one ops (n) or two ops (n,n) on the first n shapes.
+- In this case, n is all shapes up to, but not including, m.
+- Does need to do...
+  - one ops on each (m)    // m
+  - two ops on each (m, m) // m^2
+  - two ops on each (m, n) // n*m
+  - two ops on each (n, m) // n*m
+- basically every two op except each (n, n) // n^2
+- that's (m+n)^2 - n^2 + m ops.
+
+Notes
+- I'm inventing both rounds and batches.  Can probably be the same thing.
+- (n+m)^2 = n^2 + 2nm + m^2
+- 2nm + m^2 = m(2n+m)
+- Could probably do the same thing in memory.
+- Why is this not what the code is currently doing?
+- The code is currently doing ...?
+
+Alternative...
+- Store all shapes in a fixed size database
+- Use a large cache (1M or more) of the shapes
+- Read from disk as needed.
+- This would not have all shapes in memory, so can't check for duplicates without reading from disk.
+
+Solution finder
+- The goal is to find a solution for all shapes, perferably a minimum cost solution.
+- A solution is the sequence of operations needed to build the shape from primitive shapes.
+- Each shape only needs to store the one operation that was used to build it.
+- The solution database could be a fixed length binary file:
+  - 2^32 records, index / position would be the shape value
+  - each record would have 9 bytes: op code, shape1, shape2 (optional)
+- Method 1: (op priorty)
+  - Operations would have a preference, try them in order and record the first one found.
+  - Ideally all shapes would be in memory, but would only need store one copy of them.
+  - This would work, and find a solution for all shapes, but does not account for length of the solution.
+- Method 2: (build cost)
+  - Need to try all possible ops for all shapes.
+  - Need to record solution with accumulated cost.
+  - When a lower cost is found, replace the solution.
+  - Not clear if this is correct...
+
+Example:
+- flat solid and pins are the primitive (cost=0)
+- pick one shape
+- if shape is a primitive, then solution is primitive (cost=0), else
+- try all ops (which includes using all other known shapes for 2-input ops).
+  - there might be some shortcuts, like...
+  - try ops in priority order (by cost) and stop when first one found.
+  - need crystal maker to make crystals.
+  - only stacker and pinpusher can add layers.
+  - etc.
+- record solution found with cost += op.cost (cost=1)
+  - op costs will probably be 1 for each, but maybe crystal costs 2?
+
+Notes
+- This will find solutions to all shapes, and the cost will be 0 for primitives or 1 for every other shape.
+- This is because the build found is (in most cases) not from the primitives.
+- Not very useful to just find the first operation, would probably find many cycles in the build graph.
+- Need a tree with primitives as the leaf nodes.
+- Probably need to start with the primitives and build up from there.
+
+YEAH! Ran 4-layers to completion...
+
+ITER #15
+ONE_OPS 4 50822726 > 203290904
+TWO_OPS 2 50822726 119938943 > 19216597191132320
+Writing file: data/shapes.txt
+Number of values written: 85432162
+NEW 85432162
+
+ITER #16
+ONE_OPS 4 85432162 > 341728648
+TWO_OPS 2 85432162 205371105 > 55583881441927552
+Writing file: data/shapes.txt
+Number of values written: 70384893
+NEW 70384893
+
+ITER #17
+ONE_OPS 4 70384893 > 281539572
+TWO_OPS 2 70384893 275755998 > 67728159328109958
+Writing file: data/shapes.txt
+Number of values written: 26692538
+NEW 26692538
+
+ITER #18
+ONE_OPS 4 26692538 > 106770152
+TWO_OPS 2 26692538 302448536 > 30867492991134584
+Writing file: data/shapes.txt
+Number of values written: 22536443
+NEW 22536443
+
+ITER #19
+ONE_OPS 4 22536443 > 90145772
+TWO_OPS 2 22536443 324984979 > 28280239294174290
+Writing file: data/shapes.txt
+Number of values written: 14062101
+NEW 14062101
+
+ITER #20
+ONE_OPS 4 14062101 > 56248404
+TWO_OPS 2 14062101 339047080 > 18675371761791918
+Writing file: data/shapes.txt
+Number of values written: 5398979
+NEW 5398979
+
+ITER #21
+ONE_OPS 4 5398979 > 21595916
+TWO_OPS 2 5398979 344446059 > 7380330208210162
+Writing file: data/shapes.txt
+Number of values written: 1571066
+NEW 1571066
+
+ITER #22
+ONE_OPS 4 1571066 > 6284264
+TWO_OPS 2 1571066 346017125 > 2169526465268288
+Writing file: data/shapes.txt
+Number of values written: 12229
+NEW 12229
+
+ITER #23
+ONE_OPS 4 12229 > 48916
+TWO_OPS 2 12229 346029354 > 16926072783382
+Writing file: data/shapes.txt
+Number of values written: 599
+NEW 599
+
+ITER #24
+ONE_OPS 4 599 > 2396
+TWO_OPS 2 599 346029953 > 829087049786
+Writing file: data/shapes.txt
+Number of values written: 64
+NEW 64
+
+ITER #25
+ONE_OPS 4 64 > 256
+TWO_OPS 2 64 346030017 > 88583676160
+DONE
+
+Time: 11998226
+cut: 346030017, swap: 259628769, stack: -2036339695, rotate: 346030017, pinPush 346030017, crystal 346030017, collapse: 692060034
+
+Found 346,030,017 shapes, which is a lot less than the 2B I was predicting.
+stack is negative, probably because it overflowed the AtomicInt used to count the metrics.
+
+Time was 3.33 hours, but my computer was asleep for 1-2 hours.  Let's say total was under 2 hours.
+Output file is 19.34 GB.  Not sure I can save it to GitHub.
+
+TODO
+- keep a global newShapes Set/list.
+- add to the newShapes directly.
+- take up to a max number shapes from newShapes.  probably 10M
+- more iters, less memory
+- need a method to take up to a given number of values out of a Set, into an array?
+- change two ops streams to simplify/reduce number of arrays needed.
+
+3-layer, 1 crystal
+
+Time: 16895
+cut: 4861040, swap: 3936256, stack: 388883200, rotate: 4861040, pinPush 4861040, crystal 4861040, collapse: 9722080
+
+Is that more shapes?  was 3,865,587, now 4,861,040
+
+Currently crystal1 makes just one crystal, even if the shape has more gaps.  But that's not how crystal maker works.
+Need to have a shape with just one gap, or maybe just use a primitive that has only one crystal.
+
+Fixed crystal1() to only make a crystal only if there is exactly one gap.
+
+Time: 13563
+cut: 3865587, swap: 3222025, stack: 309246960, rotate: 3865587, pinPush 3865587, crystal 40768, collapse: 7731174
+
+Shape/solution database files
+- a fixed length binary file with 2^32 9-byte entries would be ~ 40 GB
+- It would need one 1-byte value and two 32-bit values = 9 bytes per entry.
+- a text file with 1 entry per shape would be about 350M * 29 ~ 10 GB
+- It would need one 1-char entry, two or three 8-char entries, and 4 1-char spearators = 20 or 29 chars per entry
+- Maybe use 4 fields: cost, op, shape1, [shape2]
+- The advantage of fixed length is that it could be memory mapped.  But 40GB is a lot of contiguous memory.
+- The text file is actually smaller, but would need to be parsed.
+- Maybe a seriallized object could be an option?
+
+- Do I use a random access file, and write 9 bytes at a time?
+- Or do I use write an entire 2^32 size Array to disk?
+- I'm not even sure I can make a 2^32 size Array and be able to access all the entries.
+- array index is a signed int, so 2^31-1, but might be smaller depending on JVM.
+- Looks like ByteBuffer also uses an int index.
+- So does an ArrayList
+
+TODO
+- Solution finder
+- Make a new class for this.
+- Finding any solution is simpler that finding a minimum cost solution.
+- Any solution:
+  - Perform all ops (like the constructor) (in priority order?)
+    - priorty order means sequential performance.  How to do this in parallel?
+    - maybe each op has a priory number, and lower numbers overwrite higher ones?
+    - this is like cost, might do that later.
+  - Find the build (op and inputs used) for each shape found (instead of just the new shape value).
+  - Store the build if the shape is new (does not already have a build)
+  - Or, just store all of them, they just get replaced.  Don't like this option.
+- Min cost: Probably just use the same algo as before...
+  - Which does not use the known list of parts
+  - has a tiered todo list by cost
+  - ...
+- Start with primitives, which can have any cost, but zero is fine.
+  - probably use 1, so that two ops cost more than one ops.
+- Each op costs 1, maybe crystal costs 2.
+- Put the primitives in the found and todo lists.
+- take a batch out of the todo list
+- perform all ops on them (in priority order?)
+- two ops use shapes in batch (todo) and found lists, but not repeat them
+- for each shape found:
+  - compute cost: sum cost of used shapes plus cost of op
+  - if it is new, store how to make it, and cost.
+  - if it is old and costs less, replace the existing solution: how to make it, and cost.
+  - if it is old and costs the same or more, then skip it.
+  - store new shapes found in the todo list.
+- can skip remaining ops when a lower cost shape found (optimization)
+  - this bit is sequential.  Might need to do saving of shapes as separate pipeline?
+  - This may be incorrect.  What if a later op finds a lower cost?
+- store the results (incrementally ideally) in a database format
+- analyze the results
+  - for a given shape, output how to build it.
+  - probably recursive function.
+- updating and hosting the solution viewer would be awesome.
+
+Running two ops
+- Need a stream of Solutions for each (x,y)
+- How do I create a stream of (x,y) pairs?
+- Solved by using Stream.mapMulti()
+
+Ran 2-layers the first time...
+
+Time: 121131
+cut: 2489392080, swap: 1244678400, stack: 1244678400, rotate: 35280, pinPush 35280, crystal 35280, collapse: 2489427360
+
+Sorting file: BigData/shapes.db
+Reading file: BigData/shapes.db
+Number of values read: 35280
+Writing file: BigData/shapes.db
+
+The number of results is correct...
+- rotate, pinPush, crystal are num
+- swap and stack are num^2
+- cut is 2*num^2 + num because 2 for each swap plus cutRight
+
+It took 121 seconds instead of 270 msec
+
+Sample of constructor 2-layers...
+Time: 271
+cut: 35280, swap: 32400, stack: 2822400, rotate: 35280, pinPush 35280, crystal 35280, collapse: 70560
+
+- I could use fastSwap by filtering the inputs.
+- The solutions would have cut before both inputs before using swap.
+- When I implement cost based, the cost would be +2 in most cases.
+- Might be worth it to make this faster.
+- If top parts were filtered before stack, then the solutions would never put crystals on top.
+- That might be worth it too.  The solutions might be longer, but they would not waste crystals.
+
+TODO:
+- Does Map.stream() have the keys?  Map does not implement stream().
+
+Modified Solver to use only maps.
+
+Time: 117508
+cut: 2489392080, swap: 1244678400, stack: 1244678400, rotate: 35280, pinPush 35280, crystal 35280, collapse: 2489427360
+
+Maybe a little faster, but not significantly.  Hopefully uses less memory.
+
+It's finding solutions, but not very good ones...
+00000001,SR,00cf00ff,0006000f
+  00cf00ff,XX,00cf0030,00000000
+    00cf0030,SR,00ff0000,000f00f0
+      00ff0000,PP,000f0000,00000000
+        000f0000,PR,000f0000,00000000
+      000f00f0,PP,0000000f,00000000
+        0000000f,PR,0000000f,00000000
+  0006000f,XX,00060009,00000000
+    00060009,RR,0003000c,00000000
+      0003000c,SR,0000000f,000f0000
+        0000000f,PR,0000000f,00000000
+        000f0000,PR,000f0000,00000000
+
+TODO
+- Implement asString() and parse() for Build class.
+  - maybe not, since that would make the Build class bigger.
+- Solution finder: display build instructions for a given target shape.
+- Try optimizing the solver.
+  - Smaller Build and Solution classes
+  - Can Build and Solution be combined?
+  - Split makeShapes into two or more parts (one ops, two ops, etc.)  Add to newBuilds after each set of ops.
+  - Prefilters for swap and stack
+    - swap would always have cut first, but that should be easy to optimize aftward.
+    - stack would always stack non-crystals, which would probably be the perfered solution.
+    - Not sure how these would affect which solutions are found, especially when using min cost solver.
+- Implement separate class for Solution list/set.  HashMap<Integer, Build> or List<Solution>?
+- Implement min cost solver.
+- Upgrade and host solution finder.
+
+Last found...
+File shapes2_1.db
+
+00000001 <- SR(00cf00ff, 0006000f)
+  00cf00ff <- XX(00cf0030)
+    00cf0030 <- SR(00ff0000, 000f00f0)
+      00ff0000 <- PP(000f0000)
+        000f0000 <--
+      000f00f0 <- PP(0000000f)
+        0000000f <--
+  0006000f <- XX(00060009)
+    00060009 <- RR(0003000c)
+      0003000c <- SR(0000000f, 000f0000)
+        0000000f <--
+        000f0000 <--
+
+First found...
+File shapes2_2.db
+
+Find solution for: 00000001
+00000001 <- SR(00cf00ff, 0006000f)
+  00cf00ff <- XX(00cf0030)
+    00cf0030 <- SR(00ff0000, 000f00f0)
+      00ff0000 <- PP(000f0000)
+        000f0000 <--
+      000f00f0 <- PP(0000000f)
+        0000000f <--
+  0006000f <- XX(00060009)
+    00060009 <- RR(0003000c)
+      0003000c <- SR(0000000f, 000f0000)
+        0000000f <--
+        000f0000 <--
+
+It's the same solution.
+
+Added all types of one ops, and ran them before two_ops...
+File shapes2_3.db
+
+00000001 <- CR(00000009)
+  00000009 <- RL(00000003)
+    00000003 <- CR(0000000f)
+      0000000f <--
+
+Just full flats...
+File shapes2_4.db
+
+Baseline test
+Time: 144447
+cut: 2489427360, swap: 1244678400, stack: 1,244,678,400, rotate: 105840, pinPush 35280, crystal 35280, collapse: 2489462640
+
+Implemented pre-filter (no crystals) on Stack op.
+Time: 122874
+cut: 2489427360, swap: 1244678400, stack: 113,742,720, rotate: 105840, pinPush 35280, crystal 35280, collapse: 2489462640
+
+Well, a lot less stack ops, but still took just as long to run.
+
+Using FastSwap (only halves) and FastStack (no crystal tops)...
+File shapes2_5.db
+
+Time: 4174
+cut: 70560, swap: 64800, stack: 113742720, rotate: 105840, pinPush 35280, crystal 35280, collapse: 105840
+
+- total = 35,280
+- halves = 180
+- cut = 2 * total
+- swap = 2 * halves^2
+- stack = 2334 * total
+- rotate = 3 * total
+- pinPush = total
+- crystal = total
+- collapse = cut + pinPush = 3 * total
+
+Running solutions for 3-layers...
+- It is taking hours to complete.
+- CPU is less than 20%.
+- not sure parallel stream are working as they should.
+- might try adding parallelStream() in some cases.
+
+Stopped it early (4+ hours)
+TODO 1797010
+ITER #25
+ONE_OPS 7 100000 > 700000
+TWO_OPS 3 100000 1884465 > 1160679000000
+
+file: shapes3_0.db
+
+Did not find all the shapes yet.
+Maybe need a check - if total number of shapes reaches the known value, then copy all shapes over and quit early.
+
+TODO
+- Optmize Build and Solution classes.
+  - Maybe they can be just one class.
+  - Simplify the constructors.
+- Just use Ops.Name for the op in Build class.
+  - This probably makes it bigger, but makes the code to calculate the cost smaller.
+
+Ran Solver for 4-layers, 10 iters.
+- It is taking hours for each batch of 100,000 input shapes.
+- Sometimes finding over 1M for each batch.
+- CPU is under 20% most of the time.
+- Very slow - need a way to find why it is taking so long.
+  - More stats?
+  - peformance analysis tools?
+  - Java telemetry?  That can work on multi-threaded code?
+- The differences are:
+  - using Streams of Solutions rather than IntStreams.
+  - More one ops
+  - Two swap ops instead of one
+  - More stack ops (no crystal on top, but can be more than one layer)
+  -> It's the stacking ops most likely.  But I did change the Stream to IntStream.
+- I suspect it's the Streams of class objects rather than primitive int values.
+  - more data alocation, more data to access, etc.
+- Is there a way to do solutions with just IntStreams?
+  - Need result shape, op, one or two input shapes, cost.
+  - Maybe these can be stored in one place, rather than pass them through Streams?
+- Also, Constructor and Solver are almost identical code.
+  - Should be a way to combine them, without making Constructor slow
+  - Use generics?
+  - Store the builds / solutions as an option?
+
+ITER #10
+ONE_OPS 7 100000 > 700000
+TWO_OPS 3 100000 451238 > 300742800000
+Writing file: BigData/shapes.db
+TODO 5654847
+
+Writing file: BigData/shapes.db
+Time: 25416576
+cut: 1102476, swap: 1610496, stack: 179984168142, rotate: 1653714, pinPush 551238, crystal 551238, collapse: 1653714
+
+Sorting file: BigData/shapes.db
+Reading file: BigData/shapes.db
+Error reading file: BigData/shapes.db
+java.util.InputMismatchException: For input string: "f0000fff" under radix 16
+        at java.base/java.util.Scanner.nextInt(Scanner.java:2264)
+        at java.base/java.util.Scanner.nextInt(Scanner.java:2212)
+        at ShapeFile.readDB(ShapeFile.java:85)
+        at ShapeFile.sort(ShapeFile.java:102)
+        at Main.makeShapes(Main.java:33)
+        at Main.main(Main.java:19)
+Number of values read: 11
+Writing file: BigData/shapes.db
+
+Oh no, looks like the data was overwriten???
+Yep, only 11 shapes in 7 hours.
+It had found 551,238 + 5,654,847 which is 6M out of 350M
+
+TODO
+- don't overwrite files
+- Looks like a problem with Scanner and negative int values
+
+TODO
+- It is possible to find parts with lower cost.  What happens?
+  - They replace an existing part.
+  - Which may change the cost of a next level part, or
+  - might replace a part that would have been used?
+- Might have to keep the new shapes found in order.
+  - to ensure that low-level parts are made before parts that take more steps.
+- Not sure if the tiered todo list is needed.
+
+The one-layer top makes a big difference...
+Time: 2940
+cut: 70560, swap: 32400, stack: 113742720, rotate: 105840, pinPush 35280, crystal 35280, collapse: 105840
+Time: 401
+cut: 70560, swap: 32400, stack: 2822400, rotate: 105840, pinPush 35280, crystal 35280, collapse: 105840
+
+stack is total * 3224 vs total * 80
+
+There are 40 times more stack ops, but only 7 times slower.  So I guess that is okay?
+
+Adding the other Swap does not make a significant difference.
+
+Time: 452
+cut: 70560, swap: 64800, stack: 2822400, rotate: 105840, pinPush 35280, crystal 35280, collapse: 105840
+
+3-layer, one-layer tops...
+
+Solver w/100,000 batch size
+ITER #45
+Time: 17496
+cut: 7731174, swap: 6444050, stack: 309246960, rotate: 11596761, pinPush 3865587, crystal 3865587, collapse: 11596761
+
+Constructor w/10,000,000 batch size
+ITER #21
+Time: 15618
+cut: 3865587, swap: 3222025, stack: 309246960, rotate: 3865587, pinPush 3865587, crystal 3865587, collapse: 7731174
+
+About the same amount of time.
+with multi-layer tops, it takes much longer (hours?)
+
+TODO
+- Intercept a ctrl-c signal, and save the intermediate results.  DONE
+
+I can/should filter out ops that return the same shape.
+
+Added costs to builds.
+
+TODO
+- Need more than a byte to store the cost.  DONE
+
+00d700be,SW,00c4008c,00130032,78
+
+Why does crystal increase the cost by 8?  Should be 2.
+            000a000f <- XX(00000005)  17
+              00000005 <- ST(00000001, 00000004)   9
+
+The db file has this:
+000a000f,XX,00000005,00000000,11
+
+hex problem? yep
+
+00ba007b,RR,00d500bd,00000000,004a
+00db007e,SW,00130032,00c8004c,004f
+
+... and the max costs changes each run...
+
+Maybe it's the parallel streams finding different solutions?
+I hope it's not a thread safety problem.
+
+Implemented low cost replacement.
+
+00ff005f,SW,00cc004c,00330013,2d  // I think this is my angry bird shape
+00ff00fa,SW,00cc00c8,00330032,2d
+
+Tue Jun 25 14:33:38 PDT 2024
+
+Reading file: BigData/shapes.db
+Number of values read: 35280
+Find solution for: 00ff005f
+ 45 00ff005f <- SW(00cc004c, 00330013)
+ 23   00cc004c <- CL(00dc006f)
+ 22     00dc006f <- RL(00b900cf)
+ 21       00b900cf <- SW(008800cc, 00310003)
+ 12         008800cc <- CL(008800ff)
+ 11           008800ff <- XX(00000077)
+  9             00000077 <- SW(00000033, 00000044)
+  4               00000033 <- CR(000000ff)
+  3                 000000ff <- ST(0000000f, 0000000f)
+  1                   0000000f <--
+  1                   0000000f <--
+  6               00000044 <- CL(00000066)
+  5                 00000066 <- RL(000000cc)
+  4                   000000cc <- CL(000000ff)
+  3                     000000ff <- ST(0000000f, 0000000f)
+  1                       0000000f <--
+  1                       0000000f <--
+ 10         00310003 <- CR(00f1000f)
+  9           00f1000f <- ST(000f0000, 0001000f)
+  1             000f0000 <--
+  7             0001000f <- XX(0000000e)
+  5               0000000e <- SW(00000002, 0000000c)
+  4                 00000002 <- CR(00000006)
+  3                   00000006 <- RL(0000000c)
+  2                     0000000c <- CL(0000000f)
+  1                       0000000f <--
+  2                 0000000c <- CL(0000000f)
+  1                   0000000f <--
+ 23   00330013 <- CR(0073009f)
+ 22     0073009f <- RR(00b900cf)
+ 21       00b900cf <- SW(008800cc, 00310003)
+ 12         008800cc <- CL(008800ff)
+ 11           008800ff <- XX(00000077)
+  9             00000077 <- SW(00000033, 00000044)
+  4               00000033 <- CR(000000ff)
+  3                 000000ff <- ST(0000000f, 0000000f)
+  1                   0000000f <--
+  1                   0000000f <--
+  6               00000044 <- CL(00000066)
+  5                 00000066 <- RL(000000cc)
+  4                   000000cc <- CL(000000ff)
+  3                     000000ff <- ST(0000000f, 0000000f)
+  1                       0000000f <--
+  1                       0000000f <--
+ 10         00310003 <- CR(00f1000f)
+  9           00f1000f <- ST(000f0000, 0001000f)
+  1             000f0000 <--
+  7             0001000f <- XX(0000000e)
+  5               0000000e <- SW(00000002, 0000000c)
+  4                 00000002 <- CR(00000006)
+  3                   00000006 <- RL(0000000c)
+  2                     0000000c <- CL(0000000f)
+  1                       0000000f <--
+  2                 0000000c <- CL(0000000f)
+  1                   0000000f <--
+
+Find solutions for 2-layer shapes.  using multi-layer tops.
+
+ITER #13
+ONE_OPS 7 820 > 5740
+TWO_OPS 3 820 34460 > 171560400
+DONE
+
+Time: 3309
+cut: 70560, swap: 64800, stack: 113742720, rotate: 105840, pinPush 35280, crystal 35280, collapse: 105840
+
+Solver results
+size: 35280
+Writing file: BigData/shapes.db
+max cost: 45 (2d)
+
+file shapes2_6.db
+
+Find solutions for 3-layer shapes, using only one-layer tops...
+
+ITER #45
+ONE_OPS 7 25416 > 177912
+TWO_OPS 3 25416 3840171 > 587548635984
+DONE
+
+Time: 41523
+cut: 7731174, swap: 6444050, stack: 309246960, rotate: 11596761, pinPush 3865587, crystal 3865587, collapse: 11596761
+
+Solver results
+size: 3865587
+Writing file: BigData/shapes.db
+max cost: 74 (4a)
+
+00ff005f,RR,00ff00af,00000000,2e
+0f030f3f,RR,0f090f9f,00000000,4a
+
+file shapes3_1.db
+
+I don't know why the cost was one more than it was with 2-layer solution.
+Maybe the order of the solver, but I thought it should be trying all possible combos.
+Maybe it's the stacking change (one vs multi-layer)?  No, the 2-layer solution only as 1-layer tops.
+
+Ran 3-layer again, got a different result...
+00ff005f,SW,00330013,00cc004c,2d
+
+TODO
+- When cost is lower, could replace Build values rather than make new Build.
+- Use a tiered todo list?  But I'm not sure if that is needed or not.
+- How to make the results determinate / the same every time?
+- currently, I'm not sure the cost is always correct.
+  - finding a lower cost solution replaces a shape build.
+  - if the replaced shape was used before, then the derived shapes are not updated.
+  - if the replaced shape was not used before, then it might have been skipped as a higher cost solution.
+  - maybe the only way to have accurate cost is to actually build a solution tree.
+  - replacing a shape would change the cost of all derived shapes
+  - but more importantly, should be reused as a new todo shape <---
+- currently, there's a disjoint -
+  - every op performed might make a new solution, but might not make a new shape.
+- cost is always increasing. That is the cost of a solution is more than the cost of the parts that are used to make it.
+  - unless there are zero cost ops.
+- so how can a lower cost solution be found?  Examples?
+
+OLD:   3 000f00f0 <- ST(0000000f, 000f0000)
+NEW:   2 000f00f0 <- PP(0000000f)
+OLD:   3 00ff0000 <- ST(000f0000, 000f0000)
+NEW:   2 00ff0000 <- PP(000f0000)
+Pinpush (one input) is less expesive than stack (two inputs).
+
+OLD:   5 000f00ff <- ST(0000000f, 000f000f)
+NEW:   4 000f00ff <- XX(000f00f0)
+crystal shortcut - one crystal op instead of two
+
+OLD:   8 003f00ff <- XX(000f00cf)
+NEW:   5 003f00ff <- XX(000c00c0)
+Crystal makes the same shape, but with less expensive input shape.
+
+OLD:   9 00cf003f <- ST(00000003, 00cf000f)
+NEW:   7 00cf003f <- ST(000c0003, 000f000f)
+stacker shortcut
+
+OLD:   7 003f00c0 <- SW(000c00c0, 00330000)
+NEW:   4 003f00c0 <- PP(0003000c)
+Pinpush (one input) is less expesive than swap (two inputs).
+
+Added lower cost shapes back to todo list.
+
+Ran 3-layers, one-layer tops...
+
+ITER #55
+ONE_OPS 7 68 > 476
+TWO_OPS 3 68 3865587 > 1577173368
+LOW 0
+DONE
+
+Time: 53810
+cut: 9456894, swap: 8193278, stack: 378791820, rotate: 14185341, pinPush 4728447, crystal 4728447, collapse: 14185341
+
+Solver results
+size: 3865587
+Writing file: BigData/shapes.db
+max cost: 72 (48)
+
+Took longer, but it finished.
+It has a lower max cost, but not sure since it can vary.
+
+00ff005f,SW,00cc004c,00330013,2d - Angry bird is back to lower cost
+0f030f3f,RR,0f090f9f,00000000,48
+
+file shapes3_2.db
+
+What if I make crystal cost 1?
+
+ITER #51
+ONE_OPS 7 3870 > 27090
+TWO_OPS 3 3870 3865587 > 89803860840
+LOW 0
+DONE
+
+Time: 49352
+cut: 8885784, swap: 7514278, stack: 355947600, rotate: 13328676, pinPush 4442892, crystal 4442892, collapse: 13328676
+
+Solver results
+size: 3865587
+Writing file: BigData/shapes.db
+max cost: 68 (44)
+
+file shapes3_3.db
+
+00ff005f,SW,00cc004c,00330013,29
+0f030f3f,RR,0f090f9f,00000000,44
+
+Max cost is now 68 instead of 72.
+That's because there are four crystal ops, and they cost one less each.
+Still pretty high.
+
+Pins with only flats...
+ 15 000f0000 <- SW(000c0000, 00030000)
+  8   000c0000 <- CL(00ef00f0)
+  7     00ef00f0 <- PP(000e000f)
+  6       000e000f <- XX(00000001)
+  4         00000001 <- CR(00000009)
+  3           00000009 <- RL(00000003)
+  2             00000003 <- CR(0000000f)
+  1               0000000f <--
+  8   00030000 <- CR(00bf00f0)
+  7     00bf00f0 <- PP(000b000f)
+  6       000b000f <- XX(00000004)
+  4         00000004 <- CL(00000006)
+  3           00000006 <- RL(0000000c)
+  2             0000000c <- CL(0000000f)
+  1               0000000f <--
+
+This makes quarters and the crystals.
+Isn't cheaper to crystalize half shapes?
+I guess this is cheaper because it uses only one swap instead of 2.
+
+full > half > crystal > pinpush  5
+x2 5
+then swap 11 (crystals on pins 00ff00f0)
+x2 11
+then swap 23
+
+000f0000 <- SW(00ff00f0, 00ff00f0)
+  00ff00f0,PP,000f000f,00000000,08  // full crystal on pins
+    000f000f,XX,000c000c,00000000,07  // full crystal
+      000c000c,CL,000c000f,00000000,05  // half cystal
+        000c000f,XX,00000003,00000000,04  // half crystal / half solid
+          00000003,CR,0000000f,00000000,02  // half solid
+  
+swaps are expensive because they sum the cost of both inputs.
+
+Verified that the most costly (72) 3-layer shape solution works.
+It uses exactly the same crystal breaking and shape falling technique and shape I found when trying to make gap under crystal.
+It also make a crystal-solid-crystal corner with one crystal maker.
+It does each of these twice and swaps them to make: 0f030f3f ccccRuRu:RuRu----:cccccccc
+
+3-layer, one-layer tops...
+
+ITER #55
+ONE_OPS 7 846 > 5922
+TWO_OPS 3 846 3865587 > 19623866760
+LOW 0
+DONE
+
+Time: 58066
+cut: 9515778, swap: 8270798, stack: 381147348, rotate: 14273667, pinPush 4757889, crystal 4757889, collapse: 14273667
+
+About 60 seconds to find low cost solutions to 3,865,587 shapes with less than 4-layers.
+The constructor takes about 15 seconds, so this is 4 times as long.
+
+TODO
+- Compare results with and without adding lower cost shapes back to the todo list.
+- There might be a way to minimize the number of lower cost shapes.
+  - tiered todo?
+  - check them before the remaining todo list?
+  - other?
+
+With lower cost shapes first...
+
+ITER #85
+INPUT 8
+ONE_OPS 7 8 > 56
+TWO_OPS 3 8 3865587 > 185548368
+DONE
+
+Time: 110971
+cut: 15311898, swap: 18509862, stack: 612992364, rotate: 22967847, pinPush 7655949, crystal 7655949, collapse: 22967847
+
+Solver results
+size: 3865587
+Writing file: BigData/shapes.db
+max cost: 70 (46)
+total cost: 120,383,876
+
+With lower cost shapes last...
+
+ITER #55
+INPUT 192
+ONE_OPS 7 192 > 1344
+TWO_OPS 3 192 3865587 > 4453266816
+DONE
+
+Time: 60629
+Time: 64822
+cut: 9428296, swap: 8133574, stack: 377648356, rotate: 14142444, pinPush 4714148, crystal 4714148, collapse: 14142444
+cut: 10044556, swap: 8801496, stack: 402298768, rotate: 15066834, pinPush 5022278, crystal 5022278, collapse: 15066834
+
+Solver results
+size: 3865587
+Writing file: BigData/shapes.db
+max cost: 70 (46)
+total cost: 120,118,857
+total cost: 120,288,153
+total cost: 120,937,977
+
+Hmm - it finds different solutions each time.  Need to figure out how to find all solutions.
+Adding the lower cost to the end makes it run faster, and a little bit cheaper maybe?  nope, it varies.
+Don't know why, and don't know if there is a better method to find low cost solutions.
+My feeling is that lower cost shapes need to be reused with all shapes, or we need to build a tree.
+Maybe multiple passes over the entire solution set?
+
+Without lower cost shapes...
+
+Time: 46718
+cut: 7731174, swap: 6444050, stack: 309246960, rotate: 11596761, pinPush 3865587, crystal 3865587, collapse: 11596761
+
+Solver results
+size: 3865587
+Writing file: BigData/shapes.db
+max cost: 70 (46)
+total cost: 120,605,918
+total cost: 120,951,147
+total cost: 122,304,324
+
+Okay, I really don't understand now.  It found a smaller total cost, without resusing the lower cost shapes.
+
+cut is 2 * total
+swap is 2 * 1795^2
+stack is 80 * total
+
+Try sorting the todo list by cost...
+
+Solver results
+size: 3865587
+Writing file: BigData/shapes.db
+max cost: 70 (46)
+total cost: 121,205,336
+
+And the cost is more.  How does that work?
+Maybe the sorted data is not is staying sorted.  Or the costs are wrong.
+I am using synchronized LinkedHashSet objects.  They are supposed to stay ordered.
+Don't know for sure that an addAll(x) will keep the order from x.
+
+Try without the batch limit...
+00010014,SW,00010010,00000004,08
+00010014,SW,00010010,00000004,09
+
+  8 00010014 <- SW(00010010, 00000004)
+  5   00010010 <- CR(00090090)
+  4     00090090 <- PP(00000009)
+  3       00000009 <- RL(00000003)
+  2         00000003 <- CR(0000000f)
+  1           0000000f <--
+  4   00000004 <- CL(00000006)
+  3     00000006 <- RL(0000000c)
+  2       0000000c <- CL(0000000f)
+  1         0000000f <--
+
+  9 00010014 <- SW(00010010, 00000004)
+  5   00010010 <- PP(00000001)
+  4     00000001 <- CR(00000009)
+  3       00000009 <- RL(00000003)
+  2         00000003 <- CR(0000000f)
+  1           0000000f <--
+  4   00000004 <- CL(00000006)
+  3     00000006 <- RR(00000003)
+  2       00000003 <- CR(0000000f)
+  1         0000000f <--
+
+The costs are correct.
+Swap can reduce the cost by 1 or 2.
+There are 10 nodes (builds) in each case...
+In case1, there is a PP then CR.  Swap -2 = 8
+In case2, there is a CR then PP.  Swap -1 = 9
+Shape 00010010 can be made either way.  pin on solid.
+
+  5   00010010 <- CR(00090090)
+  4     00090090 <- PP(00000009)
+
+  5   00010010 <- PP(00000001)
+  4     00000001 <- CR(00000009)
+
+The cost of this shape is the same in both cases, so the low cost function did not replace it.
+Whichever is found first wins.
+Maybe it should have a preference?
+Or maybe swap should not subtract costs?
+Make stack more expensive to compensate?
+
+Try with no Swap discount...
+
+0003001c,SW,0000000c,00030010,0b
+0003001c,SW,00030010,0000000c,0a
+
+These are swaps with the inputs swapped.  But they have different costs?
+
+ 11 0003001c <- SW(0000000c, 00030010)
+  2   0000000c <- CL(0000000f)
+  1     0000000f <--
+  7   00030010 <- CR(006f00f0)
+  6     006f00f0 <- RR(003f00f0)
+  5       003f00f0 <- PP(0003000f)
+  4         0003000f <- XX(0000000c)
+  2           0000000c <- CL(0000000f)
+  1             0000000f <--
+
+ 10 0003001c <- SW(00030010, 0000000c)
+  7   00030010 <- CR(006f00f0)
+  6     006f00f0 <- PP(0006000f)
+  5       0006000f <- XX(00000009)
+  3         00000009 <- RL(00000003)
+  2           00000003 <- CR(0000000f)
+  1             0000000f <--
+  2   0000000c <- CL(0000000f)
+  1     0000000f <--
+
+- Crystal costs 2
+- In the first case, the cost seems to be wrong.
+- Both input shapes have the same costs in both cases (2 and 7).
+- Even though one shape is made differently, it has the same cost.
+- The final swap should be 2+7+1 = 10.
+- The 00030010 shape must have been more expensive (8) at the point the target shape was made.
+- How?
+- It could happen if both the target shape and a lower cost input shape was found in the same iteration.
+- Only if - the lower cost was found after the target shape.
+- Fix?
+- While finding new shapes, they could/should only use old shape builds.
+- That would prevent this from happening.
+- But then what if a lower cost of an input/existing shape is found?
+- That should not happen.  Why?
+- How did it find a lower cost build of an existing shape in a later iter?
+
+Iter 4
+...
+ 12 0003001c <- ST(00000001, 0003000c)
+  8 00030010 <- CR(000f0090)
+
+- both found the first time in iter 4.
+- but the target does not use the input shape.
+
+Iter 5
+ 11 0003001c <- SW(00030010, 0000000c)
+  7 00030010 <- CR(006f00f0)
+...
+- Early in iter 5, a lower cost target shape is found, with the input shape.
+- And then a lower cost is found for the input shape.
+- So both are lowered in the same iter, but the target/derived shape uses the old, more expensive, input shape build.
+- Now if the target shape is used as input in another shape, then that new shape will have the wrong cost.
+- But the cost of the target is wrongly higher than it should be.
+- If it was the correct lower value, then maybe it would have replaced a build for the new shape.
+- And now the new shape might have a different higher cost build than it should have because it was not replaced.
+
+Note: running with sequential streams, the cost results are always the same.
+
+Solver results
+size: 35280
+Writing file: BigData/shapes.db
+max cost: 71 (47)
+total cost: 1033491
+
+Also, looks like the same Op was invoked twice...
+  9 00030010 <- ST(00000001, 00030000)
+  9 00030010 <- ST(00000001, 00030000)
+Same top and bottom shapes.  How?
+
+It's not, the inputs are different each time...
+  8 00030010 <- CR(000f0090)
+  9 00030010 <- CR(00030090)
+ 12 00030010 <- CR(0003009c)
+  9 00030010 <- ST(00000001, 00030000)
+ 12 0003001c <- ST(00000001, 0003000c)
+
+Possible tiered solution...
+
+In iter 1, all input shapes have cost 1 (because they are primitives).
+The new shapes found have cost > 1, but might be 2, 3, 4, 5, etc.
+After iter 1, the input shapes become old shapes.
+All the builds are stored together.
+
+In iter 2, the input shapes are new shapes with cost 2.
+The new shapes have cost > 2, but might be 3, 4, 5, 6, etc.
+Need to try all combos, except each (old, old).
+
+Will this have the problem found?  Where lower cost existing shapes are found?
+Cost is computed using the sum of the cost of the input shapes.
+In iter 2, the input shapes all have cost of 2.  Resulting shapes are > 2.
+Might replace an existing build since those might have larger cost values.
+
+TODO
+- Don't store duplicate new shapes. Just store the lowest cost one.
+- I don't think this is a problem, since cost is from allBuilds, and it stores only the lowest cost.
+- Can the new shape filters (for allShapes and inputShapes) be removed?  Are these all new shapes?
+- No. If they are not filtered out, then the old shapes get re-inserted into the newShapes list.
+- use distict() to avoid inserting the same shape more than once into the new shapes list.
+- This causes a concurrent modification exception, why?
+
+Implemented tiered todo shapes by cost.
+
+Ran 2-layers...
+
+Time: 1247
+cut: 108208, swap: 119336, stack: 4338168, rotate: 162312, pinPush 54104, crystal 54104, collapse: 162312
+
+Solver results
+size: 35280
+Writing file: BigData/shapes.db
+max cost: 71 (47)
+total cost: 1011995
+
+Why are the stats different?  Higher.
+
+was: (with multi-layer top)
+cut: 70560, swap: 64800, stack: 113742720, rotate: 105840, pinPush 35280, crystal 35280, collapse: 105840
+
+Doing more work somewhere?
+Maybe finding lower cost builds, so there's more than one of the same shape?
+Should delete older new shape when newer lower cost one is found.
+Yep! that was it...
+
+cut: 70560, swap: 64800, stack: 2822400, rotate: 105840, pinPush 35280, crystal 35280, collapse: 105840
+
+Ran 3-layers...
+
+DONE
+
+Time: 161356
+cut: 7729602, swap: 6444050, stack: 309184080, rotate: 11594403, pinPush 3864801, crystal 3864801, collapse: 11594403
+
+Solver results
+size: 3865435
+Writing file: BigData/shapes.db
+max cost: 111 (6f)
+total cost: 183621458
+
+It didn't finish.
+But it is much slower, and the cost much higher.
+Still running sequential streams.  Maybe that's why it is slower.
+But why is the cost more?
+
+was 70 max cost and 120M total cost
+
+Ran 3-layers to completion...
+
+Time: 185891
+cut: 7731174, swap: 6444050, stack: 309246960, rotate: 11596761, pinPush 3865587, crystal 3865587, collapse: 11596761
+
+Solver results
+size: 3865587
+Writing file: BigData/shapes.db
+max cost: 112 (70)
+total cost: 183637114
+
+file shapes3_4.db
+
+000000ff,ST,0000000f,0000000f,05
+0f330f3f,RR,0f990f9f,00000000,70
+
+Looks like this is using stack cost = 3, where the old database was cost = 1.
+
+000000ff,ST,0000000f,0000000f,05
+000000ff,ST,0000000f,0000000f,03
+
+This probably explains the higher max and total cost values.
+This will cause the data to be "spread-out" more, fewer shapes in more buckets.
+
+With parallel streams...
+
+Time: 81062
+cut: 7731180, swap: 6444050, stack: 309247196, rotate: 11596770, pinPush 3865590, crystal 3865590, collapse: 11596770
+
+Solver results
+size: 3865587
+Writing file: BigData/shapes.db
+max cost: 112 (70)
+total cost: 183637114
+
+cost is the same!
+and it's faster, 81 seconds vs 186 seconds.
+was under 60 seconds with previous method. but that had bad costs that may have caused non-minimum solutions.
+I'm pretty sure this tiered todo list method finds minimum cost solutions.
+
+Time: 79562
+cut: 7731178, swap: 6444050, stack: 309247120, rotate: 11596767, pinPush 3865589, crystal 3865589, collapse: 11596767
+
+Solver results
+size: 3865587
+Writing file: BigData/shapes.db
+max cost: 112 (70)
+total cost: 183637116
+
+Oops, cost not the same (off by only a few).
+The stats are also off by a few.  Why?
+The stats should be exact, but look a few over.
+
+Ran 1-layer a few times...
+
+COST 7
+ONE_OPS 7 20 > 140
+TWO_OPS 3 20 35 > 5400
+Exception in thread "main" java.lang.IndexOutOfBoundsException
+        at java.base/jdk.internal.reflect.NativeConstructorAccessorImpl.newInstance0(Native Method)
+        at java.base/jdk.internal.reflect.NativeConstructorAccessorImpl.newInstance(NativeConstructorAccessorImpl.java:77)
+        at java.base/jdk.internal.reflect.DelegatingConstructorAccessorImpl.newInstance(DelegatingConstructorAccessorImpl.java:45)
+        at java.base/java.lang.reflect.Constructor.newInstanceWithCaller(Constructor.java:499)
+        at java.base/java.lang.reflect.Constructor.newInstance(Constructor.java:480)
+        at java.base/java.util.concurrent.ForkJoinTask.getThrowableException(ForkJoinTask.java:564)
+        at java.base/java.util.concurrent.ForkJoinTask.reportException(ForkJoinTask.java:591)
+        at java.base/java.util.concurrent.ForkJoinTask.invoke(ForkJoinTask.java:689)
+        at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateParallel(ForEachOps.java:159)
+        at java.base/java.util.stream.ForEachOps$ForEachOp$OfInt.evaluateParallel(ForEachOps.java:188)
+        at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:233)
+        at java.base/java.util.stream.IntPipeline.forEach(IntPipeline.java:463)
+        at Solver.makeShapes(Solver.java:246)
+        at Solver.run(Solver.java:206)
+        at Main.makeShapes(Main.java:34)
+        at Main.main(Main.java:19)
+Caused by: java.lang.IndexOutOfBoundsException: Index 17 out of bounds for length 16
+        at java.base/jdk.internal.util.Preconditions.outOfBounds(Preconditions.java:64)
+        at java.base/jdk.internal.util.Preconditions.outOfBoundsCheckIndex(Preconditions.java:70)
+        at java.base/jdk.internal.util.Preconditions.checkIndex(Preconditions.java:266)
+        at java.base/java.util.Objects.checkIndex(Objects.java:361)
+        at java.base/java.util.ArrayList.get(ArrayList.java:427)
+        at TSet.get(TSet.java:12)
+        at Solver.doOp(Solver.java:148)
+        at Solver.lambda$18(Solver.java:264)
+        at java.base/java.util.stream.IntPipeline$8$1.accept(IntPipeline.java:358)
+        at java.base/java.util.Spliterators$IntArraySpliterator.forEachRemaining(Spliterators.java:1076)
+        at java.base/java.util.Spliterator$OfInt.forEachRemaining(Spliterator.java:711)
+        at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+        at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+        at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:150)
+        at java.base/java.util.stream.ForEachOps$ForEachOp$OfInt.evaluateSequential(ForEachOps.java:188)
+        at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+        at java.base/java.util.stream.IntPipeline.forEach(IntPipeline.java:463)
+        at java.base/java.util.stream.ReferencePipeline$8$1.accept(ReferencePipeline.java:324)
+        at java.base/java.util.ArrayList$ArrayListSpliterator.forEachRemaining(ArrayList.java:1625)
+        at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+        at java.base/java.util.stream.ForEachOps$ForEachTask.compute(ForEachOps.java:290)
+        at java.base/java.util.concurrent.CountedCompleter.exec(CountedCompleter.java:754)
+        at java.base/java.util.concurrent.ForkJoinTask.doExec(ForkJoinTask.java:373)
+        at java.base/java.util.concurrent.ForkJoinPool$WorkQueue.topLevelExec(ForkJoinPool.java:1182)
+        at java.base/java.util.concurrent.ForkJoinPool.scan(ForkJoinPool.java:1655)
+        at java.base/java.util.concurrent.ForkJoinPool.runWorker(ForkJoinPool.java:1622)
+        at java.base/java.util.concurrent.ForkJoinWorkerThread.run(ForkJoinWorkerThread.java:165)
+Shutdown
+
+Got different results each time.
+There's something wrong with my TSet class.  probably not concurrent safe somewhere.
+When I use sequential streams, the stat values look good.
+How do I make it safe?
+
+Reverted back to Set<Integer> for todo list...
+
+Time: 48
+cut: 510, swap: 450, stack: 20400, rotate: 765, pinPush 255, crystal 255, collapse: 765
+Time: 498
+cut: 70560, swap: 64800, stack: 2822400, rotate: 105840, pinPush 35280, crystal 35280, collapse: 105840
+Time: 48116
+cut: 7731174, swap: 6444050, stack: 309246960, rotate: 11596761, pinPush 3865587, crystal 3865587, collapse: 11596761
+
+safe, correct, and much faster
+
+max cost: 112 (70)
+total cost: 184,634,785
+max cost: 112 (70)
+total cost: 185,378,825
+
+But the costs are inaccurate.  It's probably good enough.
+
+Implement new tiered todo...
+
+Time: 731
+cut: 70560, swap: 64800, stack: 2822400, rotate: 105840, pinPush 35280, crystal 35280, collapse: 105840
+
+Solver results
+size: 35280
+Writing file: BigData/shapes.db
+max cost: 71 (47)
+total cost: 1011995
+total cost: 1011996
+
+Sometimes the total cost is off by one.
+
+Found 00cc00c1 11 12
+Find solution for: 00cc00c1
+ 11 00cc00c1 <- SW(00000001, 00cc00c0)
+  4   00000001 <- CR(00000009)
+  3     00000009 <- RL(00000003)
+  2       00000003 <- CR(0000000f)
+  1         0000000f <--
+  6   00cc00c0 <- PP(000c000c)
+  5     000c000c <- CL(000c000f)
+  4       000c000f <- XX(00000003)
+  2         00000003 <- CR(0000000f)
+  1           0000000f <--
+
+Find solution for: 00cc00c1
+ 12 00cc00c1 <- RU(00330034)
+ 11   00330034 <- SW(00330030, 00000004)
+  6     00330030 <- PP(00030003)
+  5       00030003 <- CR(0003000f)
+  4         0003000f <- XX(0000000c)
+  2           0000000c <- CL(0000000f)
+  1             0000000f <--
+  4     00000004 <- CL(00000006)
+  3       00000006 <- RR(00000003)
+  2         00000003 <- CR(0000000f)
+  1           0000000f <--
+
+There is only one RU, and it's in only one of the db files:
+00cc00c1,RU,00330034,00000000,0c
+
+The second file has:
+00000001,CR,00000009,00000000,04
+00cc00c0,PP,000c000c,00000000,06
+
+so why did it not find this?
+11 00cc00c1 <- SW(00000001, 00cc00c0)
+
+or if it did, why did it skip it?
+
+COST 6
+ONE_OPS 7 38 > 266
+TWO_OPS 3 38 54 > 16644
+NEW:  11 00cc00c1 <- SW(00cc00c0, 00000001)
+NEW:  13 00cc00c1 <- ST(00000001, 00cc00c0)
+NEW:  11 00cc00c1 <- SW(00000001, 00cc00c0)
+OLD: 22
+
+COST 11
+ONE_OPS 7 347 > 2429
+TWO_OPS 3 347 648 > 1710363
+OLD:  13 00cc00c1 <- ST(00000001, 00cc00c0)
+NEW:  12 00cc00c1 <- RU(00330034)
+OLD: 690
+
+DEBUG:  12 00cc00c1 <- RU(00330034)
+
+Looks like it got 3 new builds all at the same time.
+Somehow the 13 won, and then was replaced later with a 12.
+
+Fixed - I added a sync block around allBuilds.get() and allBuilds.put().
+
+2-layer...
+total cost: 1011995
+3-layer...
+Time: 83639
+cut: 7731174, swap: 6444050, stack: 309246960, rotate: 11596761, pinPush 3865587, crystal 3865587, collapse: 11596761
+
+Solver results
+size: 3865587
+Writing file: BigData/shapes.db
+max cost: 112 (70)
+total cost: 183637114
+
+Time: 86170
+cut: 7731174, swap: 6444050, stack: 309246960, rotate: 11596761, pinPush 3865587, crystal 3865587, collapse: 11596761
+
+Solver results
+size: 3865587
+Writing file: BigData/shapes.db
+max cost: 112 (70)
+total cost: 183637114
+
+Yeah! all the stats and costs are now the same each run.
+It just takes twice as long as without the tiered todo.
+
+TODO
+- Confirm todo shapes are correct after COST 1 iter. DONE
+  - There are only 2 cost 5 shapes found?  Should be 4 I think.
+  - doOp(x,y) is called 4 times, but 2 results are already known (pins under) with lower cost.
+  - It finds old builds with lower costs, so they are not replaced or added.
+- Add batch processing back. DONE
+- Incremental saves.
+- Save all builds on shutdown.  DONE
+- Optimizations
+  - Reduce memory size to avoid swapping to disk.
+  - Does Build need the result shape?
+  - Is Build smaller/quicker if Ops.Name is used?
+- It keeps running multiple tiers after ^C.
+- check for exit flag in doOp.  DONE
+
+Before batch...
+Time: 81857
+cut: 7731174, swap: 6444050, stack: 309246960, rotate: 11596761, pinPush 3865587, crystal 3865587, collapse: 11596761
+
+Solver results
+size: 3865587
+Writing file: BigData/shapes.db
+max cost: 112 (70)
+total cost: 183637114
+
+After batch... (size 100,000)
+Time: 80843
+cut: 7731174, swap: 6444050, stack: 309246960, rotate: 11596761, pinPush 3865587, crystal 3865587, collapse: 11596761
+
+Solver results
+size: 3865587
+Writing file: BigData/shapes.db
+max cost: 112 (70)
+total cost: 183637114
+
+Looks like batch works okay.
+
+Run 4-layer up to cost 32, and then hit ^C...
+
+COST                      33
+SIZE                 100,000
+TOTAL              6,269,730
+ONE_OPS              700,000
+TWO_OPS    3,791,838,000,000
+Shutdown
+Writing file: BigData/shapes.db
+BUILDS            66,624,419
+DUPS                 177,326
+
+file shapes4_1.db
+
+I did not see a max or total cost output, but the file is over 2GB.
+It saved 66,487,065 builds out of 346,030,017 total.  That's about 20%.
+
+Somewhere in the middle of the file...
+80000888,CL,90000999,00000000,10
+...
+ffffffff,XX,ffff0000,00000000,06
+00000001,CR,00000009,00000000,04
+...
+7fffffff,XX,08888000,00000000,09
+
+Looks like it sorted them numerically, puting negative values first.
+
+SIZE         414,416
+MAX COST          29 (1d)
+SUM COST   9,165,904
+
+Fixed it by using unsignedCompare in the sort.
+Also fixed readDB by using parseUnsignedInt.
+
+TODO
+- What if?  I know all the 3-layer parts without crystals.  Can this be used to speed up the 4-ayer stack ops?
+  - Really need all 4-layer (or less) parts without crystals.  I can get this from the Constructor.
+  - And does it help?
+  - Still need to do a lot more stack ops.
+  - But don't need to weed out the bad ones by checking that the part has no crystals.
+
+Ran 4-layers to cost 42...
+
+COST                      43
+SIZE                 100,000
+TOTAL             30,406,698
+ONE_OPS              700,000
+TWO_OPS   18,274,018,800,000
+BUILDS           154,336,312
+DUPS                  96,750
+
+SIZE                 100,000
+TOTAL             30,506,698
+ONE_OPS              700,000
+TWO_OPS   18,334,018,800,000
+Shutdown
+Writing file: BigData/shapes.db
+BUILDS           154,477,500
+DUPS                  26,557
+...
+Time: 3137851
+cut: 68568600, swap: 276407072, stack: 2742744000, rotate: 102852900, pinPush 34284300, crystal 34284300, collapse: 102852900
+
+file shapes4_2.db
+
+Took a _long_ time to save the file.
+Has 154,477,500 entries
+
+FOUND              1,589,211  new shapes
+                     567,278  new builds
+DUPS                 207,136  lower cost builds
+
+- new shapes are shapes that are not in the todo list yet.
+- but they may or may not be in the build list:
+  - not in the build list (added to build)
+  - lower cost (dup) (replaces a build)
+  - same or higher cost (not added to builds)
+- so that would be about 800,000 new shapes found with a higher cost and not added to the build.
+- they would have been found before, added to both the build and todo lists.
+- but they don't get added to the done list (allShapes) until after they were input shapes and used.
+- might be better to break down these numbers better.
+- maybe capture more stats to make sure they are correct.
+- What would the best set of numbers / stats be?
+
+TODO
+- Faster DB file reader
+- Maybe write spew to a log file?
+- Alternate costs?
+- Alternate solver alg?  e.g. turn-off tiered todo to make it faster
+- shape viewer upgrade would be nice.
+- prototype GPU processing.  OpenCL, CUDA, others?
+- run 4-layer to completion.
+
+With 1-layer tops...
+
+Solver results
+TOTAL                 35,280
+SUM_COST           1,011,995
+MAX_COST                  71 (47)
+
+With multi-layer tops...
+Solver results
+TOTAL                 35,280
+SUM_COST           1,011,691
+MAX_COST                  71 (47)
+
+file shapes2_7.db
+
+The max cost is the same.
+The sum cost is 304 less.
+That's about 100 stack ops, out of 35,000 shapes.
+
+Find most complex 1-layer shape...
+
+000f0005,SW,000c0004,00030001,1f
+
+Find solution for: 000f0005
+ 31 000f0005 <- SW(00030001, 000c0004)
+ 15   00030001 <- CR(00070009)
+ 14     00070009 <- RR(000b000c)
+ 13       000b000c <- SW(0008000c, 00030000)
+ 10         0008000c <- CL(0008000f)
+  9           0008000f <- XX(00000007)
+  7             00000007 <- SW(00000003, 00000004)
+  2               00000003 <- CR(0000000f)
+  1                 0000000f <--
+  4               00000004 <- CL(00000006)
+  3                 00000006 <- RR(00000003)
+  2                   00000003 <- CR(0000000f)
+  1                     0000000f <--
+  2         00030000 <- CR(000f0000)
+  1           000f0000 <--
+ 15   000c0004 <- CL(000d0006)
+ 14     000d0006 <- RL(000b000c)
+ 13       000b000c <- SW(0008000c, 00030000)
+ 10         0008000c <- CL(0008000f)
+  9           0008000f <- XX(00000007)
+  7             00000007 <- SW(00000003, 00000004)
+  2               00000003 <- CR(0000000f)
+  1                 0000000f <--
+  4               00000004 <- CL(00000006)
+  3                 00000006 <- RR(00000003)
+  2                   00000003 <- CR(0000000f)
+  1                     0000000f <--
+  2         00030000 <- CR(000f0000)
+  1           000f0000 <--
+
+  This doesn't look correct.
+  000f0005 is pins/crystal checkers, yes?
+  value: 000f0005, code: crP-crP-:--------:--------:--------
+  where are the pins comming from?
+  I see now pins are input.
+  It makes a mold with 1 gap crystalize, swaps it with pins, rotates.
+  Does this twice, and then swaps.
+  It's long because it has (10) extra cuts before the swaps.
+
+Find most complex 2-layer shape...
+
+00ff005f,SW,00330013,00cc004c,47
+
+That's my angry bird.
+It's the 1-layer shape on top of solid crystal layer.
+
+Find most complex 3-layer shape...
+
+0f330f3f,RR,0f990f9f,00000000,70
+
+This is the one before, it is now less cost (but that may be because it was wrong before)
+0f030f3f,RL,0f060f6f,00000000,6c
+
+file shapes1-all.db
+file shapes2-all.db
+file shapes3-all.db
+
+COST                     100  // the current cost tier
+SIZE                     312  // the size of the batch passed to makeShapes
+TOTAL              3,864,489  // size of allShapes, old shapes that have already been used as inputs
+BUILDS             3,865,371  // total number of shapes seen before running makeShapes
+ONE_OPS                2,184  // number of one-input ops to be performed (before optimization)
+TWO_OPS        7,234,615,440  // number of two-input ops to be performed (before optimization)
+BUILDS             3,865,435  // total number of shapes seen after running makeShapes
+FOUND                    120  // number of shapes found (not used as input shapes before)
+DUPS                      40  // number of lower cost builds found
+NEW                       64  // number of new shapes found
+
+On Linux
+# wget https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.3%2B9/OpenJDK21U-jdk_x64_linux_hotspot_21.0.3_9.tar.gz
+# sudo dnf install git-all
+# git clone https://github.com/garretsimpson/spuj.git
+# ~/java/jdk-21.0.3+9/bin/javac *.java
+# ~/java/jdk-21.0.3+9/bin/java -Xmx54G Main
+
+TODO
+- Why is Sovler 6x slower than Constructor?
+- Add more metrics?
+- Try Streams of Builds rather than accessing commin allBuilds.
+
+Ran out of memory...
+
+SIZE                 630,438
+TOTAL             79,158,364
+BUILDS           250,684,333
+ONE_OPS            4,413,066
+TWO_OPS  300,619,000,316,124
+FOUND              2,977,273
+DUPS                 664,199
+NEW                  102,191
+...
+COST                      53
+SIZE               1,000,000
+TOTAL             79,788,802
+BUILDS           250,786,524
+ONE_OPS            7,000,000
+TWO_OPS  481,732,812,000,000
+
+Exception: java.lang.OutOfMemoryError thrown from the UncaughtExceptionHandler in thread "ForkJoinPool.commonPool-worker-5"
+
+Exception: java.lang.OutOfMemoryError thrown from the UncaughtExceptionHandler in thread "ForkJoinPool.commonPool-worker-15"
+client_loop: send disconnect: Connection reset
+
+r5a.4xlarge
+
+16 CPU, 128 RAM
+
+Ran to completion...
+
+Time: 41949118
+cut: 692060032, swap: 519193088, stack: 27682401280, rotate: 1038090048, pinPush 346030016, crystal 346030016, collapse: 1038090048
+
+Shutdown
+Writing file: BigData/shapes.db
+
+Solver results
+TOTAL            346,030,016
+SUM_COST       1,564,802,640
+MAX_COST                 148 (94)
+
+Yeah! done in 11.7 hours.
+I wonder what it cost me in CPU hours.
+
+1 less shape than before???
+
+Reran Constructor with 4-layers...
+
+ITER #45
+ONE_OPS 4 4362465 > 17449860
+TWO_OPS 2 4362465 341614171 > 5999181659718510
+TODO 53380
+
+ITER #46
+ONE_OPS 4 53380 > 213520
+TWO_OPS 2 53380 345976636 > 73878630167520
+DONE
+
+Time: 4723312
+cut: 346030016, swap: 259596544, stack: 27682401280, rotate: 346030016, pinPush 346030016, crystal 346030016, collapse: 692060032
+
+Now the count is 346,030,016 which matches the Solver.
+
+-rw-r--r--. 1 ec2-user ec2-user 11,418,990,528 Jul  1 02:22 shapes.db
+-rw-r--r--. 1 ec2-user ec2-user  2,313,787,844 Jul  1 02:22 shapes.db.gz
+
+That's 11 GB or 2.3 GB compressed.
+
+Hopefully I can compress it and copy it somewhere.
+I don't know if GitHub can store that large a file.
+Looks like it's 2GB.
+  We don't limit the total size of the binary files in the release or the bandwidth used to deliver them. However, each individual file must be smaller than 2 GiB.
+Windows - You can put 4,294,967,295 files into a single folder if drive is formatted with NTFS (would be unusual if it were not) as long as you do not exceed 256 terabytes (single file size and space) or all of disk space that was available whichever is less.
+https://stackoverflow.com/questions/466521/how-many-files-can-i-put-in-a-directory
+
+TODO
+- Array of Arrays to store the data.
+- Each array would be 2^16 entries.
+- data[v1][v2]
+- Probably need to split the data file into parts as well.
+- But 2^16 files is a lot of files for one directory.
+- You can, but that would still be a lot.
+- Maybe 256 files?  Maybe 256 directories?
+- What would be useful?
+
+A binary file with 2^16 entries
+- each entry would need 1 byte for the op and 2 32-bit shape values.  72 bytes?
+- Maybe make it 80 or 96 bytes each.
+- About 5 or 6 MB.
+- But there would still be about 2^16 files.
+- Could do nested directories, but that's a pain.  (Unless there a library for that).
+
+# cat shapes.db | split -d -l1000000 - DB
+
+- 256 files by top-layer?
+- Examples:
+  - shapes00.db - 0xxx0xxx - empty top layer
+  - shapes01.db - 0xxx1xxx - 0001 on the top
+  - etc.
+  - shapesff.db - fxxxfxxx - crystals on top
+
+3-layers
+- find shapes        14 seconds
+- any solution       32 seconds ?
+- low cost solution  85 seconds
+
+              shapes  max  time
+1-layer          255   31  0.2 seconds
+2-layer       35,280   71  0.9 seconds
+3-layer    3,865,587  112   85 seconds
+4-layer  346,030,016  148  10+ hours
+
+TODO
+- There seems to be more 3-layer shapes in the 4-layer build than in 3-layer alone.
+- Need to run a compare.
+- Also check 2-layers shapes that are found with 4-layer.
+
+3,865,587 3-layer
+3,874,039 SDB00
+
+number of builds: 346030016
+1-layer        255         54
+2-layer      35408       5109
+3-layer    3874039     504006
+4-layer  346030016   43768798
+
+With just SDB00...
+
+number of builds: 3874039
+1-layer        255         54
+2-layer     35,408      5,109
+3-layer  3,874,039    504,006
+4-layer  3,874,039    504,006
+
+Oh no, it found 0x53 as a possible shape in the 4-layer solutions.
+Maybe a bug with PinPush?
+
+number of builds: 346030016
+
+value: 00000053, code: RrRr----:Rg--Rg--:--------:--------
+Find solution for: 00000053
+ 22 00000053 <- PP(cacfffff)
+ 21   cacfffff <- XX(00473530)
+ 19     00473530 <- PP(00040353)
+ 18       00040353 <- SW(00040040, 00000313)
+  5         00040040 <- CL(00060060)
+  4           00060060 <- PP(00000006)
+  3             00000006 <- RR(00000003)
+  2               00000003 <- CR(0000000f)
+  1                 0000000f <--
+ 12         00000313 <- CR(00000f9f)
+ 11           00000f9f <- ST(0000000f, 0000009f)
+  1             0000000f <--
+  7             0000009f <- ST(00000009, 0000000f)
+  3               00000009 <- RL(00000003)
+  2                 00000003 <- CR(0000000f)
+  1                   0000000f <--
+  1               0000000f <--
+
+It does a 4-layer crystal and then a pinpush.
+I think I have to do this in game to see what's happening.
+
+ 21   cacfffff <- XX(00473530)
+This is correct.
+It's making a 4-layer crystal.
+All crystal except for 3530
+
+ 22 00000053 <- PP(cacfffff)
+This is wrong.
+It should be 000f0170.
+Which is 0530 collapsed, with pins on the bottom.
+The pinpush should have broke all crystal execpt for 20002000.
+But then collapse should have broken that one, and changed 5300 to be 0017.
+
+My PushPins didn't collapse or add the pins in this case.
+
+Input shape:    cacfffff
+Crystals found: 88cf88cf
+Break crystals: 42007730
+Pins:           00000000
+Note: pins should be 000f0000, because original shape had 000f on bottom layer.
+Raise:          20007300
+
+Issue
+- If the bottom layer is empty after breaking pins, does it raise up at all?
+- I suppose it should raise up (add pins), then break crystals, then collapse.
+- So there will be 4 pins on the bottom in this case.
+- And, becuase the left-over crystal falls, it should break.
+
+Input shape:    cacfffff
+Crystals found: 88cf88cf
+Break crystals: 42007730
+Raise:          20007300
+Pins:           200f7300
+Collapse:       000f0530
+Note: Collapse should be 000f0170.  Looks like the quad 3 on layer 3 (0400) didn't fall.
+The top layer is 20007000, which is a 5 with a crystal at 2.
+Collapse didn't find the 5, because the crystal is still there, and it thinks it is a solid 7.
+But the 7 falls, breaks the crystal at 2, and the result is a 5 on layer 3.
+
+How to fix this?
+- Need to check the layer for support, break crystals if needed, split the 5 into two parts, and then drop them.
+
+TODO
+- what if left-over crystals don't fall?
+- need to test this in game.
+- rerun all shapes and builds.
+
+Constructor
+
+Time: 63
+cut: 255, swap: 225, stack: 20400, rotate: 255, pinPush 255, crystal 255, collapse: 510
+Time: 221
+cut: 35280, swap: 32400, stack: 2822400, rotate: 35280, pinPush 35280, crystal 35280, collapse: 70560
+Time: 13479
+cut: 3865587, swap: 3222025, stack: 309246960, rotate: 3865587, pinPush 3865587, crystal 3865587, collapse: 7731174
+
+Solver
+
+Time: 184
+cut: 510, swap: 450, stack: 20400, rotate: 765, pinPush 255, crystal 255, collapse: 765
+Time: 877
+cut: 70560, swap: 64800, stack: 2822400, rotate: 105840, pinPush 35280, crystal 35280, collapse: 105840
+Time: 80266
+cut: 7731174, swap: 6444050, stack: 309246960, rotate: 11596761, pinPush 3865587, crystal 3865587, collapse: 11596761
+
+TODO
+- shape-bot can display solutions...
+/operation-graph instructions:1=P-+fill; 2=Wg+fill; 1,2:stack:3 public:false
+
+1=crcrcrcr:RgRgcgcg:RbcbRbcb:RwRwcwcw; 1:pin:2
+
+ 31 crP-crP- <- SW(crP-----, ----crP-)
+ 15   crP----- <- CR(crP-P-Rr)
+ 14     crP-P-Rr <- RR(P-P-Rrcr)
+ 13       P-P-Rrcr <- SW(----Rrcr, P-P-----)
+
+1=crP-crP-; 2=crP-----; 3=----crP-; 4=crP-P-Rr; 5=P-P-Rrcr; 6=----Rrcr; 7=P-P-----; 2,3:sh:8,9; 4:cut:10,11; 5:r90cw:12; 6,7:sh:13,14
+
+1=----crP-; 2=----Rrcr; 3=P-P-----; 2,3:sh:4,5; 4:r90cw:6; 6:cut:7,8; 8,1:sh:9,10
+
+Fixed the pinpush bug and ran 4-layer solver...
+
+TODO
+ 252:          8
+
+COST                     252
+SIZE                       8
+TOTAL            349,267,176
+BUILDS           349,267,184
+ONE_OPS                   56
+TWO_OPS       16,764,824,640
+FOUND                      0
+DUPS                       0
+NEW                        0
+
+DONE
+
+Time: 49421927
+cut: 698534368, swap: 523067168, stack: 27941374720, rotate: 1047801552, pinPush 349267184, crystal 349267184, collapse: 1047801552
+
+Shutdown
+Writing file: BigData/shapes.db
+
+Solver results
+TOTAL            349,267,184
+SUM_COST       2,052,824,440
+MAX_COST                 252 (fc)
+
+ec2-user 11525817072 Jul  4 05:47 shapes.db
+
+more shapes now.
+13.7 hours
+sum_cost is probaly wrong, it's an int that wrapped around.
+
+I think there are three tiers of MAMs.  Each tier has a set of shapes it supports and methods needed to build them.
+
+SPG MAM - Can make any shape with solids, pins and gaps (no crystals)
+- Method 1: Pins on top of solids
+SCP MAM - Can make any shape with solids, cystals and pins (no gaps)
+- Method 2: Crystal on top of solid
+- Method 3: Crystal on top of pin
+EMAM - Everything MAM - Can make all possible shapes
+- Method 4: gap under solid
+- Method 5: gap under crystal
+
+TODO
+- Load only the parts/files of the database that are needed to show the solution.
+- Need to be able to read only a specified part, and keep track of which parts are already loaded.
+- Like a cache.
+
+3,865,587 shapes3-all.db
+3,874,039 SDB00-bad
+3,867,639 SDB00
+
+still found more shapes...
+
+number found: 2052
+
+Find solution for: 00030510
+value: 00030510, code: P-P-----:Rg------:Rb--Rb--:--------
+00030510 <- PP(22222273)
+  22222273 <- RR(111111b9)
+    111111b9 <- SW(11111131,00000088)
+      11111131 <- CR(111199fd)
+        111199fd <- RR(8888ccfe)
+          8888ccfe <- SW(8888cccc,00000032)
+            8888cccc <- CL(8888ffff)
+              8888ffff <- XX(00007777)
+                00007777 <- SW(00004444,00003333)
+                  00004444 <- CL(00006666)
+                    00006666 <- RR(00003333)
+                      00003333 <- CR(0000ffff)
+                        0000ffff <- ST(0000000f,00000fff)
+                          0000000f <-
+                          00000fff <- ST(0000000f,000000ff)
+                            0000000f <-
+                            000000ff <- ST(0000000f,0000000f)
+                              0000000f <-
+                              0000000f <-
+                  00003333 <- CR(0000ffff)
+                    0000ffff <- ST(0000000f,00000fff)
+                      0000000f <-
+                      00000fff <- ST(0000000f,000000ff)
+                        0000000f <-
+                        000000ff <- ST(0000000f,0000000f)
+                          0000000f <-
+                          0000000f <-
+            00000032 <- CR(000000f6)
+              000000f6 <- ST(0000000f,00000006)
+                0000000f <-
+                00000006 <- RL(0000000c)
+                  0000000c <- CL(0000000f)
+                    0000000f <-
+      00000088 <- CL(00000099)
+        00000099 <- RL(00000033)
+          00000033 <- CR(000000ff)
+            000000ff <- ST(0000000f,0000000f)
+              0000000f <-
+              0000000f <-
+
+Oh no, looks like another 5 on top of 1.
+Another pinpush breaking crystals.
+
+00030510 <- PP(22222273)
+should be
+00030114 <- PP(22222273)
+
+value: 22222273, code: Rrcr----:RgcgRg--:--cb----:--cw----
+value: 00030510, code: P-P-----:Rg------:Rb--Rb--:--------
+
+Collapse thinks 5 is supported by 1, so it just copies the layer instead of dropping two parts.
+This was changed recently.
+The problem before was that there was a 7 with crystal at two.  But it falls and the crystal breaks leaving a 5.
+The game does the right thing.
+
+How to fix?
+- Collapse may need to drop two parts on each layer.
+- The only cases of two parts is 0x5 and 0xa.
+- Either part may be a crystal.
+- If it's not one of those, then it only needs to drop one part.
+- But... if the part falls, and breaks a crystal, then it may turn into two parts that need to drop separately.
+
+fixed it by doing multi-part check twice.
+Once before breaking crystals, and once after.
+
+Rerun solver for all layers...
+
+Time: 205
+cut: 510, swap: 450, stack: 20400, rotate: 765, pinPush 255, crystal 255, collapse: 765
+Time: 821
+cut: 70560, swap: 64800, stack: 2822400, rotate: 105840, pinPush 35280, crystal 35280, collapse: 105840
+Time: 89852
+cut: 7731174, swap: 6444050, stack: 309246960, rotate: 11596761, pinPush 3865587, crystal 3865587, collapse: 11596761
+
+It's slower now: 90sec was 80sec
+
+COST                     252
+SIZE                       8
+TOTAL            349,065,168
+BUILDS           349,065,176
+ONE_OPS                   56
+TWO_OPS       16,755,128,256
+FOUND                      0
+DUPS                       0
+NEW                        0
+
+DONE
+
+Time: 49247165
+cut: 698130352, swap: 523067168, stack: 27925214080, rotate: 1047195528, pinPush 349065176, crystal 349065176, collapse: 1047195528
+
+Shutdown
+Writing file: BigData/shapes.db
+
+Solver results
+TOTAL            349,065,176
+SUM_COST       2,039,899,152
+MAX_COST                 252 (fc)
+
+still found more shapes less than 4-layers...
+
+3,865,587 shapes3-all.db
+3,874,039 SDB00-bad1
+3,867,639 SDB00-bad2
+3,865,767 SDB00
+
+180 shapes
+
+"The Claw"
+01050b10 <- PP(445444f5)  
+value: 01050b10, code: P---P---:Rg------:cbRb--Rb:--------
+value: 445444f5, code: Rr--cr--:cgRgcgRg:----cb--:----cw--
+
+Is Rg------:cbRb--Rb possible?
+001000b1 - not found
+
+Is P-------:Rg------:cbRb--Rb:-------- possible?
+01010b10 - not found
+
+Is Rg--Rg--:cbRb--Rb possible?
+001000b5 - not found
+
+value: 0aaf0700, code: P-P-P-P-:--P---P-:RbcbRbP-:--------
+0aaf0700 <- ST(00080000,02af0700)
+
+All 180 shapes all appear to variatons on this, where there are two shelves suported by one crystal.
+
+Most expensive is 252 (fc)...
+
+SDBff:f303f3f3,RL,f606f6f6,00000000,fc
+SDBff:f313f3f3,RL,f626f6f6,00000000,fc
+SDBff:f323f3f3,RL,f646f6f6,00000000,fc
+SDBff:f333f3f3,RL,f666f6f6,00000000,fc
+SDBff:fc0cfcfc,RL,f909f9f9,00000000,fc
+SDBff:fc4cfcfc,RL,f989f9f9,00000000,fc
+SDBff:fc8cfcfc,RR,f646f6f6,00000000,fc
+SDBff:fcccfcfc,RR,f666f6f6,00000000,fc
+
+value: f303f3f3, code: crcr----:RgRgRgRg:cbcb----:cwcwcwcw
+value: fcccfcfc, code: ----crcr:RgRgcgcg:----cbcb:cwcwcwcw
+
+There should be less expensive way to make O:P:O
+
+fatcatx@Lynx:/mnt/c/Users/garre/Projects/spuj/BigData$ grep 00f00f0f dbout/SDB00
+00f00f0f,ST,0000000f,00f0000f,09
+
+fatcatx@Lynx:/mnt/c/Users/garre/Projects/spuj/BigData$ grep 000f00f0 dbout/SDB00
+000f00f0,PP,0000000f,00000000,02
+
+Why didn't it just stack this on top of 0xf?
+Cost should be 6, not 9.
+
+Because it's a 2-layer part, and there's a filter that removes top parts with more than 1-layer.
+If I remove the filter, then I get...
+
+00f00f0f,ST,000f00f0,0000000f,06
+
+Which stacks the 2-layer part with pins on bottom, on top of a flat.  The cost is 6, which is correct.
+This is an example of finding a lower cost when stacking with more then one layer on top.
+It saves one stack operation, which costs 3.
+
+Run all 3-layer with multi-layer tops...
+
+file: shape3-low.db
+
+Time: 17955427
+cut: 7731174, swap: 6444050, stack: 453974537280, rotate: 11596761, pinPush 3865587, crystal 3865587, collapse: 11596761
+
+Shutdown
+Writing file: BigData/shapes.db
+
+Solver results
+TOTAL              3,865,587
+SUM_COST         180,464,780
+MAX_COST                 112 (70)
+
+max cost is still the same.
+but took 5 hours instead of 90 seconds.
+well, my computer was asleep for part of that.
+
+TODO
+- Do a cost comparison.  Find shapes that cost less / more?
+
+              shapes  max  time
+1-layer          255   31  0.2 seconds
+2-layer       35,280   71  0.9 seconds
+3-layer    3,865,587  112   85 seconds
+4-layer  349,065,176  252  10+ hours
+
+Find some shapes that can't be made without pinpush.
+- crystals on pins
+
+CbRbRbRb:P---CuP-:CyWcccWc:cw--Wr--:Wg------
+RrRrRrRr:P---RgP-:RbRbcbRb:cw--Rw--
+
+value: 14905f4f, code: RrRrRrRr:P---RgP-:RbRbcbRb:cw--Rw--
+
+14905f4f
+14b05f4f
+
+value: 14905f4f, code: RrRrRrRr:P---RgP-:RbRbcbRb:cw--Rw--
+value: 14b05f4f, code: RrRrRrRr:P-P-RgP-:RbRbcbRb:cw--Rw--
+
+CbRbRbRb:cyP-CuP-:CwWcccWc:Cy--Wy--:Wc------
+RrRrRrRr:P-P-RgP-:RbRbcbRb:Rw--Rw--
+04b05f5f
+value: 04b05f4f, code: RrRrRrRr:P-P-RgP-:RbRbcbRb:Rw--Rw--
+
+CbRbRbRb:--P-CuP-:CyWcccWc:cw--Wr--:Wg------
+14a05f4f
+
+P-:Xx:cx is possible, but Xx:P-:Xx:cx is not.
+
+P-P-cmP-:WuWuWuWu:cy------:CwCwCwCw:cgcgcgcg
+P-P-cmP-:WuWuWuWu:cy------:CwCwCwCw
+
+010ff1f4
+
+value: 010ff1f4, code: P-P-crP-:RgRgRgRg:cb------:RwRwRwRw
+010ff1f4 <- ST(0000000f,010f01f4)
+  0000000f <- 
+  010f01f4 <- SW(01030130,000c00c4)
+    01030130 <- PP(00100013)
+      00100013 <- CR(0010009f)
+        0010009f <- RR(008000cf)
+          008000cf <- SW(00000003,008000cc)
+            00000003 <- CR(0000000f)
+              0000000f <-
+            008000cc <- CL(008000ff)
+              008000ff <- XX(0000007f)
+                0000007f <- ST(00000007,0000000f)
+                  00000007 <- SW(00000004,00000003)
+                    00000004 <- CL(00000006)
+                      00000006 <- RL(0000000c)
+                        0000000c <- CL(0000000f)
+                          0000000f <-
+                    00000003 <- CR(0000000f)
+                      0000000f <-
+                  0000000f <-
+    000c00c4 <- CL(000d00f6)
+      000d00f6 <- ST(0000000f,000d0006)
+        0000000f <-
+        000d0006 <- RR(000e0003)
+          000e0003 <- SW(00020003,000c0000)
+            00020003 <- CR(0002000f)
+              0002000f <- XX(0000000d)
+                0000000d <- SW(00000001,0000000c)
+                  00000001 <- CR(00000009)
+                    00000009 <- RL(00000003)
+                      00000003 <- CR(0000000f)
+                        0000000f <-
+                  0000000c <- CL(0000000f)
+                    0000000f <-
+            000c0000 <- CL(000f0000)
+              000f0000 <-
+
+Try crystal with more than one layer gap under...
+
+Find solution for: f330f33f
+value: f330f33f, code: RrRrRrRr:cgcg----:cbcb----:cwcwcwcw
+
+Are these possible?
+01110b04 P---Cu--:P-------:crCu--Cu
+0111bb04 P---Cu--:P-------:crCu--Cu:CuCu--Cu
+
+Find solution for: 01110b04
+value: 01110b04, code: P---Rr--:P-------:cbRb--Rb:--------
+Build database or shape is missing
+
+Find solution for: 0111bb04
+value: 0111bb04, code: P---Rr--:P-------:cbRb--Rb:RwRw--Rw
+Build database or shape is missing
+
