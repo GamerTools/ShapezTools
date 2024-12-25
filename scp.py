@@ -43,9 +43,9 @@ def makeConstants():
 		ent["C"] = encodeShape(shape)
 		data.append(ent)
 		num = num + 1
-	pprint(bp)
+	# pprint(bp)
 	jdata = json.dumps(bp, separators=(",", ":")).encode(ENCODING)
-	pprint(jdata)
+	# pprint(jdata)
 	return BP_SIG + b64encode(gzip.compress(jdata)).decode(ENCODING) + "$"
 
 def main():
