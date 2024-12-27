@@ -2832,6 +2832,7 @@ well, my computer was asleep for part of that.
 TODO
 - Do a cost comparison.  Find shapes that cost less / more?
 
+Possible Shapes
               shapes  max  time
 1-layer          255   31  0.2 seconds
 2-layer       35,280   71  0.9 seconds
@@ -2922,3 +2923,142 @@ Find solution for: 0111bb04
 value: 0111bb04, code: P---Rr--:P-------:cbRb--Rb:RwRw--Rw
 Build database or shape is missing
 
+P-P-P---:P-P-----:P-cuCuCu:P-P-P-P-
+value: f3370e00, code: P-P-P---:P-P-----:P-cbRbRb:P-P-P-P-
+Build database or shape is missing
+
+00110030
+
+-----
+
+Looking at code from https://github.com/2767mr/shapestacker2...
+
+It's Go code, so learn Go. done
+Looks like it uses the same 32-bit encoding, except that quads are in reverse order for each layer.
+Modified code to output first 1,000 shape codes.
+
+Convert SDB database file to list of encoded shapes...
+% head -1000 db/SDB00 | sed -e 's/,.*//g' > myshapes.txt
+
+
+# wc -l ../shapestacker2/shapes.txt
+3866116 ../shapestacker2/shapes.txt
+# wc -l myshapes.txt
+3865767 myshapes.txt
+# diff ../shapestacker2/shapes.txt myshapes.txt > sdiff.txt
+
+Looks like they found more 3 layer shapes
+
+1d0
+< 00000000
+477145,477146d477143
+< 01010b10
+< 01010b14
+477155d477151
+< 01010b54
+479640,479641d479635
+< 01030b10
+< 01030b14
+
+01010b10
+
+Find solution for: 01010b10
+value: 01010b10, code: P-------:Rg------:cbRb--Rb:--------
+Build database or shape is missing
+
+001000b1
+value: 001000b1, code: Rr------:cgRg--Rg:--------:--------
+Build database or shape is missing
+
+349 more
+
+first 10...
+< 00000000
+< 01010b10
+< 01010b14
+< 01010b54
+< 01030b10
+< 01030b14
+< 01030b54
+< 01090b10
+< 01090b14
+< 01090b54
+
+"The Claw"
+01050b10 <- PP(445444f5)  
+value: 01050b10, code: P---P---:Rg------:cbRb--Rb:--------
+value: 445444f5, code: Rr--cr--:cgRgcgRg:----cb--:----cw--
+
+445044f1 - The claw precursor without the crystal on bottom
+- not found
+
+Do you have ----CuCu:----Cu--:----P-cr:----Cucr in your db?
+8c00c84c
+
+Find solution for: 8c00c84c
+value: 8c00c84c, code: ----RrRr:----Rg--:----P-cb:----Rwcw
+Build database or shape is missing
+
+This has crystals on top of crystals, and the bottom solid drops but the crystal does not.
+Opened a bug report to ask the dev what the correct behavior should be.
+Dev says crystals are "fused".  Which means that they are stuck to each other and will break if spearated.
+
+Is this possible?
+P-P---P-:CbCuCuCu:P-P-----:--P-crCu:CgCucrCg
+
+I don't do 5 layer shapes.
+But there is a hanging 2-layer crystal in there, which is currently not found by the solver.
+
+
+-----
+
+One constant...
+SHAPEZ2-2-H4sIAC4HbGcA/zSPMQuDMBCF/8ujYwaldAl0aKKD0KGtxaU4hJraQDgliYNI/nsTpBx38Hjcu+82dOBlWZwYxA18wyGsswaHWIwdDI1gaN4TZatSQYG/YJLmf9+D0WLtPuC/atZcLnuhjww1BWe0T4sbHuBHhmeKlxP5oCi0ZiRlK/1Riw0NBe2S7JQzyUunZSYZayEvoh3aIlxz389nxD4BG1Ju7bTzJgPmL2L8CSDAAMOlGe/RAAAA$
+
+Four constants...
+SHAPEZ2-2-H4sIAF4QbGcA/6SRMQvCMBCF/8vDMYMiLgEHm3YoOKiVokiHYGMNhFOSdJDQ/25CcZCO5biD43HfPXgBNfhqtdwwZAfwgIX/vBU4sl6bVlMHhvL+oiTl0kvwG3Tc+U93YNQbMw64p3wrLvqx0AwMBXmrlYuHAZf4i+EEvmY4xyfiRc5L8pXuSJpcPWRvfEle2bjW0uqoRQMi+emKTOyyqq2Wfp/6uN1iYGEWLZ/QRofX2T4vE/J85vmf2cTINEn7qZV1OkWUchyGrwADAOU+8oLTAQAA$
+
+{'BP': {'$type': 'Building',
+        'BinaryVersion': 1105,
+        'Entries': [{'C': 'BgEBCABSdS0tLS0tLQ==',
+                     'R': 3,
+                     'T': 'ConstantSignalDefaultInternalVariant',
+                     'X': 1},
+                    {'C': 'BgEBCABDdS0tLS0tLQ==',
+                     'R': 3,
+                     'T': 'ConstantSignalDefaultInternalVariant'},
+                    {'C': 'BgEBCABXdS0tLS0tLQ==',
+                     'R': 3,
+                     'T': 'ConstantSignalDefaultInternalVariant',
+                     'X': 1,
+                     'Y': 1},
+                    {'C': 'BgEBCABTdS0tLS0tLQ==',
+                     'R': 3,
+                     'T': 'ConstantSignalDefaultInternalVariant',
+                     'Y': 1}],
+        'Icon': {'Data': ['icon:Buildings', None, None, 'shape:CuCuCuCu']}},
+ 'V': 1105}
+
+Cu------ is 'BgEBCABDdS0tLS0tLQ=='
+
+Notes
+Looks like the fields are
+- X : west-east offset (missing when zero)
+- Y : north-south offset (missing when zero)
+- R : Rotate ?
+- T : Building Type
+- C : Constant value ?
+
+  {'C': 'BgEBCABXdS0tLS0tLQ==',
+                     'R': 3,
+                     'T': 'ConstantSignalDefaultInternalVariant',
+                     'X': 1,
+                     'Y': 1},
+
+BgEBCABSdS0tLS0tLQ== b'\x06\x01\x01\x08\x00Ru------'
+
+bytestring ?
+- 06 - type
+- 01,01 - ?
+- 08,00 - length, little-endian 
+- ... - data
