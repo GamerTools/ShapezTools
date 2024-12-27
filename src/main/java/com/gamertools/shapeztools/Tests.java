@@ -79,8 +79,10 @@ public class Tests {
     // System.out.println(new Shape(0xf123f3f3));
 
     ShapeDB db = ShapeDB.open("db");
-    findSolution(db, 0xfcccfcfc);
-    // findSolution(db, 0xfffe);
+    // findSolution(db, 0x00100011);
+    // findSolution(db, 0x00110010);
+    findSolution(db, 0x10019988);
+    findSolution(db, 0x10009989);
 
     // int[] shapes = diffShapes("BigData/shapes.db", "BigData/shapes3-all.db");
     // ShapeDB db = ShapeDB.open("BigData/dbout");
