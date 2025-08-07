@@ -3017,6 +3017,7 @@ SHAPEZ2-2-H4sIAC4HbGcA/zSPMQuDMBCF/8ujYwaldAl0aKKD0KGtxaU4hJraQDgliYNI/nsTpBx38H
 
 Four constants...
 SHAPEZ2-2-H4sIAF4QbGcA/6SRMQvCMBCF/8vDMYMiLgEHm3YoOKiVokiHYGMNhFOSdJDQ/25CcZCO5biD43HfPXgBNfhqtdwwZAfwgIX/vBU4sl6bVlMHhvL+oiTl0kvwG3Tc+U93YNQbMw64p3wrLvqx0AwMBXmrlYuHAZf4i+EEvmY4xyfiRc5L8pXuSJpcPWRvfEle2bjW0uqoRQMi+emKTOyyqq2Wfp/6uN1iYGEWLZ/QRofX2T4vE/J85vmf2cTINEn7qZV1OkWUchyGrwADAOU+8oLTAQAA$
+SHAPEZ2-3-H4sIADhqk2gA/6yRMQvCMBCF/8vDMYKtW8DBtA6Cg9pSKuIQNNZAOCVJh1L6300oDiJOynEHx+O+e/B6VOBJkqYMYgveY+K7hwKHaLW5aGrAsD7fKUq59BL8CB12/tIdGLXGjAPuJh+KZ+1YOA0MK/JWKxcOexzApwnDHnzOUIYv2Z2cl+QL3ZA0ubrK1vg1eWXDWkmrgxYcZNFQsxLZUhSXYuY3sXeLBQbWox6hf2DnH+xfaPU3p79Ay3foKcSmSdquUtbpGFPMchieAgwAxdNbcdcBAAA=$
 
 {'BP': {'$type': 'Building',
         'BinaryVersion': 1105,
@@ -3062,3 +3063,24 @@ bytestring ?
 - 01,01 - ?
 - 08,00 - length, little-endian 
 - ... - data
+
+dump a blueprint
+# cat bp | sed -ne 's/\r//;s/SHAPEZ2-3-\(.*\)\$/\1/p' | base64 -d | gzip -d | jq
+
+Some Shapez 2 guides :
+Patreon : https://tobspr-games.notion.site/tobspr-Games-Patreon-Overview-d87f39ac0b65493fa4f8ab2b9131095c
+Blueprint codes : https://gist.github.com/Loupau38/77907c80c7be3dd9f00a62d416581bb3
+Savegames : https://gist.github.com/Loupau38/926b8c8db5b8bce813384c0e00611eb0
+Note : also see ⁠technical shapez 2 
+
+
+"Ru------"
+# echo "BgEBCABSdS0tLS0tLQ==" | base64 -d | od -tx1
+0000000 06 01 01 08 00 52 75 2d 2d 2d 2d 2d 2d
+v = "\x06\x01\x01" + chr(len(value)) + "\x00"  + value
+
+"2"
+0000000 03 02 00 00 00
+type = 3
+value = 00000002
+
