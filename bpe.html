@@ -19,9 +19,6 @@
         async function runScript() {
             const userInput = document.getElementById('input').value;
             document.getElementById('output').value = "Running...";
-            // Replace with your backend URL
-            // const backendUrl = "https://<your-backend-service>/run";
-            // const backendUrl = "http://127.0.0.1:5000/run";
             const backendUrl = "https://02f7849b-0b46-4caf-a165-35d6aea7062f-00-tn2qrkrc2xed.janeway.replit.dev/run";
             try {
                 const response = await fetch(backendUrl, {
