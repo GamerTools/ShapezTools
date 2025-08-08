@@ -3,19 +3,42 @@
 <head>
     <title>Shapez2 Blueprint Creator</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 40px; }
-        input, textarea, button { margin: 8px 0; width: 100%; }
-        textarea { height: 100px; }
+        body {
+            background: #222;
+            color: #eee;
+            font-family: Arial, sans-serif;
+            margin: 40px;
+        }
+        input, textarea, button {
+            background: #333;
+            color: #eee;
+            border: 1px solid #555;
+            margin: 8px 0;
+            width: 100%;
+        }
+        textarea { height: 200px; }
+        textarea::placeholder, input::placeholder {
+            color: #888;
+        }
+        button {
+            border: 1px solid #888;
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
 </head>
 <body>
-    <h2>Shapez2 Blueprint Creator</h2>
-    <label for="input">Input list of shape codes or integers, one on each line:</label>
-    <textarea id="input" placeholder="Enter your text here"></textarea>
-    <button onclick="runScript()">Create</button>
-    <label for="output">Output:</label>
-    <textarea id="output" readonly placeholder="Blueprint string will appear here"></textarea>
+    <form style="max-width: 1000px; margin: 0 auto; background: #292929; padding: 32px; border-radius: 12px; box-shadow: 0 2px 12px #0004;">
+        <h2 style="text-align:center; margin-bottom: 24px;">Shapez2 Blueprint Creator</h2>
+        <div style="margin-bottom: 18px;">
+            <label for="input" style="display:block; margin-bottom:8px; font-weight:bold;">Input list of shape codes or integers</label>
+            <textarea id="input" placeholder="Enter one per line" style="height:120px; resize:vertical;"></textarea>
+        </div>
+        <button type="button" onclick="runScript()" style="width:100%; padding:12px; font-size:1.1em; background:#444; color:#fff; border-radius:6px; border:none; cursor:pointer;">Create Blueprint</button>
+        <div style="margin-top: 24px;">
+            <label for="output" style="display:block; margin-bottom:8px; font-weight:bold;">Output blueprint</label>
+            <textarea id="output" readonly placeholder="Blueprint string will appear here" style="height:200px; resize:vertical;"></textarea>
+        </div>
+    </form>
     <script>
         const ENCODING = "utf-8";
         const BP_SIG = "SHAPEZ2-3-";
