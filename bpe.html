@@ -7,6 +7,7 @@
         input, textarea, button { margin: 8px 0; width: 100%; }
         textarea { height: 100px; }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
 </head>
 <body>
     <h2>Shapez2 Blueprint Creator</h2>
@@ -16,21 +17,65 @@
     <label for="output">Output:</label>
     <textarea id="output" readonly placeholder="Blueprint string will appear here"></textarea>
     <script>
+        const ENCODING = "utf-8";
+        const BP_SIG = "SHAPEZ2-3-";
+        const SIGNAL_TYPE = "ConstantSignalDefaultInternalVariant";
+        const EMPTY_BP = {
+	        "V": 1122,
+	        "BP": {
+         	"$type": "Building",
+  	        "Icon": {"Data": ["icon:Buildings", null, null, "shape:CuCuCuCu"]},
+          	"Entries": [],
+  	        "BinaryVersion": 1122
+	        }
+        };
+
+        function chr(byte) {
+            return String.fromCharCode(byte);
+        }
+
+        function isAllDigits(str) {
+            return /^\d+$/.test(str);
+        }
+
+        function encodeValue(value) {
+	        if (isAllDigits(value)) {
+		        const num = Number(value);
+		        v = "\x03" + chr(num & 0xff) + chr((num >> 8) & 0xff) + "\x00\x00";
+	        } else {
+		        // TODO: verify shape code
+		        v = "\x06\x01\x01" + chr(value.length) + "\x00"  + value;
+            }
+            return btoa(v);
+        }
+
+        const MAX_X = 16;
+        function makeConstants(text) {
+            data = [];
+            num = 0;
+            text.split('\n').forEach(line => {
+                value = line.trim();
+                if (value === "")
+                    return;
+                ent = {};
+                ent["X"] = num % MAX_X;
+                ent["Y"] = Math.floor(num / MAX_X);
+                ent["R"] = 3;
+                ent["T"] = SIGNAL_TYPE;
+                ent["C"] = encodeValue(value);
+                data.push(ent);
+                num = num + 1;
+            });
+            bp = EMPTY_BP;
+            bp["BP"]["Entries"] = data;
+            const jdata = JSON.stringify(bp);
+            console.log(jdata);
+            return BP_SIG + btoa(String.fromCharCode(...pako.gzip(jdata))) + "$";
+        }
+
         async function runScript() {
             const userInput = document.getElementById('input').value;
-            document.getElementById('output').value = "Running...";
-            const backendUrl = "https://02f7849b-0b46-4caf-a165-35d6aea7062f-00-tn2qrkrc2xed.janeway.replit.dev/run";
-            try {
-                const response = await fetch(backendUrl, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ input: userInput })
-                });
-                const data = await response.json();
-                document.getElementById('output').value = data.output;
-            } catch (e) {
-                document.getElementById('output').value = "Error: " + e;
-            }
+            document.getElementById('output').value = makeConstants(userInput)
         }
     </script>
 </body>
