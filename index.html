@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Python Runner Web App</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        input, textarea, button { margin: 8px 0; width: 100%; }
+        textarea { height: 100px; }
+    </style>
+</head>
+<body>
+    <h2>Shapez2 Blueprint Creator</h2>
+    <label for="input">Input list of shape codes or integers, one on each line:</label>
+    <textarea id="input" placeholder="Enter your text here"></textarea>
+    <button onclick="runScript()">Create</button>
+    <label for="output">Output:</label>
+    <textarea id="output" readonly placeholder="Blueprint string will appear here"></textarea>
+    <script>
+        async function runScript() {
+            const userInput = document.getElementById('input').value;
+            document.getElementById('output').value = "Running...";
+            // Replace with your backend URL
+            // const backendUrl = "https://<your-backend-service>/run";
+            // const backendUrl = "http://127.0.0.1:5000/run";
+            const backendUrl = "https://02f7849b-0b46-4caf-a165-35d6aea7062f-00-tn2qrkrc2xed.janeway.replit.dev/run";
+            try {
+                const response = await fetch(backendUrl, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ input: userInput })
+                });
+                const data = await response.json();
+                document.getElementById('output').value = data.output;
+            } catch (e) {
+                document.getElementById('output').value = "Error: " + e;
+            }
+        }
+    </script>
+</body>
+</html>
