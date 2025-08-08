@@ -36,7 +36,7 @@ def makeConstants():
 	bp = json.loads(EMPTY_BP)
 	data = bp["BP"]["Entries"]
 	num = 0
-	for line in fileinput.input(encoding = ENCODING):
+	for line in fileinput.input():
 		value = line.strip()
 		ent = {}
 		ent["X"] = num % MAX_X
