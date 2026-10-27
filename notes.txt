@@ -3084,3 +3084,30 @@ v = "\x06\x01\x01" + chr(len(value)) + "\x00"  + value
 type = 3
 value = 00000002
 
+Blueprint format has changed.
+One constant (42_
+SHAPEZ2-5-H4sIAMep4GoA/6yQQWsCQQyF/0oJHoel4qUMeHBXEcGDdIu0iIfRphKYzchstjAt898bpag3FcwhEPLyviS/0JO0R7AwdQ0WVYhYlL7DfSSWosZIztOPEwp8rjYeTxrzdHUQDCzB9vuDFwPlAuyZWXbkP4l3qpiwRML2snvnRv9eB6O0Wt+2V+/baU+pq4dgb4O+g3028HHM82N+BTsw8KbwKnArjqWmHTs/xi/XeZmxYNRy6dSIRS2qyz/VqRVsijIJHu5u2m2Injan81QySmGkMYSc1znnPwEGAKomwOD2AQAA[]_2$
+Four constants (null, 42, Ru------, red)
+SHAPEZ2-5-H4sIAOal4GoA/8SRQUsDMRCF/4oMPcZl114k0MNmrSL0oEZKpfSQ2nEJZJOSnVViyX83K9L2ZgXZBhIYZua9+TI7GFHYInC4Uw1mlfOYCdPh1mtLmUSvldGfirSzh2htcF/DLn5tBAZz4EUxvmYgHoAfPEWnzUbbOlVMLXmN7XH2jxP9aPVCYbk6ba7Ru0q55Lr8F9vTTBfALwsGL8BzBrPv9wn4mMFzcq+cbUlZkrq2ytzgm+oM3VtCn8K5SkqWkkZ1/FEytIRNJgJhD960r84bvd7zpZLycTKBGNmwmPnQlMGV6ZyBdOh9inoqqlLIjcxp1t+z7PdqaOqP25AoVzHGLwEGAIaa8H65BAAA[]_2$
+
+{
+  "$type": "Game.Core.Blueprint.Serialization.SerializableBlueprint, Game.Core.Blueprint.Serialization",
+  "V": 1138,
+  "BP": {
+    "$type": "Building",
+    "Entries": {
+      "$type": "Game.Core.Blueprint.Serialization.SerializableBuildingEntry[], Game.Core.Blueprint.Serialization",
+      "$values": [
+        {
+          "$type": "Game.Core.Blueprint.Serialization.SerializableBuildingEntry, Game.Core.Blueprint.Serialization",
+          "X": -1,
+          "Y": 0,
+          "L": 0,
+          "R": 3,
+          "T": "ConstantSignalDefaultInternalVariant",
+          "C": {
+            "$type": "System.Byte[], mscorlib",
+            "$value": "AQ=="
+          }
+        },
+
