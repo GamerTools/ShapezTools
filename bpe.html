@@ -41,16 +41,19 @@
     </form>
     <script>
         const ENCODING = "utf-8";
-        const BP_SIG = "SHAPEZ2-3-";
+        const BP_PREFIX = "SHAPEZ2-5-";
+        const BP_SUFFIX = "[]_2$";
         const SIGNAL_TYPE = "ConstantSignalDefaultInternalVariant";
         const EMPTY_BP = {
-	        "V": 1122,
+         	"$type": "Game.Core.Blueprint.Serialization.SerializableBlueprint, Game.Core.Blueprint.Serialization",
+	        "V": 1138,
 	        "BP": {
-         	"$type": "Building",
-  	        "Icon": {"Data": ["icon:Buildings", null, null, "shape:CuCuCuCu"]},
-          	"Entries": [],
-  	        "BinaryVersion": 1122
-	        }
+         	    "$type": "Building",
+          	    "Entries": {
+                    "$type": "Game.Core.Blueprint.Serialization.SerializableBuildingEntry[], Game.Core.Blueprint.Serialization",
+                    "$values": [],
+                }
+	        }   
         };
 
         function chr(byte) {
@@ -77,23 +80,27 @@
             data = [];
             num = 0;
             lines = text.trim().split('\n');
-            for(line of lines) {
+            for (line of lines) {
                 value = line.trim();
                 if (value === "") continue;
-                ent = {};
+                ent = {"$type": "Game.Core.Blueprint.Serialization.SerializableBuildingEntry, Game.Core.Blueprint.Serialization"};
                 ent["X"] = num % MAX_X;
                 ent["Y"] = Math.floor(num / MAX_X);
+                ent["L"] = 0
                 ent["R"] = 3;
                 ent["T"] = SIGNAL_TYPE;
-                ent["C"] = encodeValue(value);
+                ent["C"] = {
+                    "$type": "System.Byte[], mscorlib",
+                    "$value": encodeValue(value)
+                };
                 data.push(ent);
                 num = num + 1;
             }
             bp = EMPTY_BP;
-            bp["BP"]["Entries"] = data;
+            bp["BP"]["Entries"]["$values"] = data;
             const jdata = JSON.stringify(bp);
             console.log(jdata);
-            return BP_SIG + btoa(String.fromCharCode(...pako.gzip(jdata))) + "$";
+            return BP_PREFIX + btoa(String.fromCharCode(...pako.gzip(jdata))) + BP_SUFFIX;
         }
 
         async function runScript() {
